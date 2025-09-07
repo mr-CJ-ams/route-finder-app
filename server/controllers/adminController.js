@@ -57,11 +57,13 @@
 const AdminModel = require("../models/adminModel");
 const { sendEmailNotification } = require("../utils/email");
 
-// Get all users with role 'user'
+// Get all users with role 'user' and matching address to admin
 exports.getUsers = async (req, res) => {
   try {
-    const allUsers = await AdminModel.getUsers();
-    res.json(allUsers);
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+    const users = await AdminModel.getUsersByAddress(region, province, municipality);
+    res.json(users);
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
@@ -127,7 +129,6 @@ exports.deactivateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await AdminModel.deactivateUser(id);
-    
     if (result === null) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -143,7 +144,6 @@ exports.updateAccommodation = async (req, res) => {
   try {
     const { id } = req.params;
     const { accommodation_type } = req.body;
-    
     await AdminModel.updateAccommodation(id, accommodation_type);
     res.json({ message: "Accommodation type updated successfully" });
   } catch (err) {
@@ -152,22 +152,24 @@ exports.updateAccommodation = async (req, res) => {
   }
 };
 
-// Get submissions with filters, pagination, and search
+// Get submissions with filters, pagination, and search, filtered by admin's address
 exports.getSubmissions = async (req, res) => {
   try {
     const {
       page = 1, limit = 20, month, year, status, penaltyStatus, search,
     } = req.query;
     const offset = (page - 1) * limit;
-    
-    const { submissions, total } = await AdminModel.getSubmissions(
-      { month, year, status, penaltyStatus, search },
-      { limit, offset }
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const result = await AdminModel.getSubmissionsWithAddress(
+      { month, year, status, penaltyStatus, search, limit, offset },
+      { region, province, municipality }
     );
-    
+
     res.json({
-      submissions,
-      total,
+      submissions: result.submissions,
+      total: result.total,
       page: parseInt(page),
       limit: parseInt(limit),
     });
@@ -181,7 +183,10 @@ exports.getSubmissions = async (req, res) => {
 exports.getMonthlyCheckins = async (req, res) => {
   try {
     const { year } = req.query;
-    const result = await AdminModel.getMonthlyCheckins(year);
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const result = await AdminModel.getMonthlyCheckins(year, region, province, municipality);
     res.json(result);
   } catch (err) {
     console.error("Error fetching monthly check-ins:", err);
@@ -193,13 +198,16 @@ exports.getMonthlyCheckins = async (req, res) => {
 exports.getMonthlyMetrics = async (req, res) => {
   try {
     const { year } = req.query;
-    const { metrics, totalUsers } = await AdminModel.getMonthlyMetrics(year);
-    
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const { metrics, totalUsers } = await AdminModel.getMonthlyMetrics(year, region, province, municipality);
+
     const metricsWithSubmissionRate = metrics.map((row) => ({
       ...row,
       submission_rate: totalUsers > 0 ? ((row.total_submissions / totalUsers) * 100).toFixed(2) : 0,
     }));
-    
+
     res.json(metricsWithSubmissionRate);
   } catch (err) {
     console.error("Error fetching monthly metrics:", err);
@@ -211,7 +219,10 @@ exports.getMonthlyMetrics = async (req, res) => {
 exports.getNationalityCounts = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const result = await AdminModel.getNationalityCounts(year, month);
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const result = await AdminModel.getNationalityCounts(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
     console.error("Error fetching nationality counts:", err);
@@ -223,7 +234,10 @@ exports.getNationalityCounts = async (req, res) => {
 exports.getNationalityCountsByEstablishment = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const result = await AdminModel.getNationalityCountsByEstablishment(year, month);
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const result = await AdminModel.getNationalityCountsByEstablishment(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
     console.error("Error fetching nationality counts by establishment:", err);
@@ -235,10 +249,26 @@ exports.getNationalityCountsByEstablishment = async (req, res) => {
 exports.getGuestDemographics = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const result = await AdminModel.getGuestDemographics(year, month);
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+
+    const result = await AdminModel.getGuestDemographics(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
     console.error("Error fetching guest demographics:", err);
     res.status(500).json({ error: "Failed to fetch guest demographics" });
+  }
+};
+
+// Get pending users for approval, filtered by admin's address
+exports.getPendingUsers = async (req, res) => {
+  try {
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+    const users = await AdminModel.getPendingUsersByAddress(region, province, municipality);
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

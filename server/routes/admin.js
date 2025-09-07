@@ -80,5 +80,13 @@ router.get("/nationality-counts", authenticateToken, adminController.getNational
 router.get("/nationality-counts-by-establishment", authenticateToken, requireAdmin, adminController.getNationalityCountsByEstablishment);
 router.get("/guest-demographics", authenticateToken, adminController.getGuestDemographics);
 
+// Pending users
+router.get(
+  '/pending-users',
+  authenticateToken,
+  requireAdmin,
+  adminController.getPendingUsers
+);
+
 module.exports = router;
 

@@ -63,14 +63,12 @@ class AdminModel {
 
   static async approveUser(id) {
     await pool.query("UPDATE users SET is_approved = true WHERE user_id = $1", [id]);
-    const user = await pool.query("SELECT email FROM users WHERE user_id = $1", [id]);
-    return user.rows[0].email;
+    return true;
   }
 
   static async declineUser(id) {
-    const user = await pool.query("SELECT email FROM users WHERE user_id = $1", [id]);
     await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
-    return user.rows[0].email;
+    return true;
   }
 
   static async deactivateUser(id) {
@@ -105,6 +103,43 @@ class AdminModel {
       [accommodation_type, accommodation_code, id]
     );
     return true;
+  }
+
+  // Get admin's address by user_id
+  static async getAdminAddress(adminId) {
+    const result = await pool.query(
+      `SELECT region, province, municipality FROM users WHERE user_id = $1 AND role = 'admin'`,
+      [adminId]
+    );
+    if (result.rows.length === 0) throw new Error('Admin not found');
+    return result.rows[0];
+  }
+
+  // Get users with matching address to admin
+  static async getUsersByAddress(region, province, municipality) {
+    const result = await pool.query(
+      `SELECT * FROM users
+       WHERE role = 'user'
+         AND TRIM(region) ILIKE TRIM($1)
+         AND TRIM(province) ILIKE TRIM($2)
+         AND TRIM(municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    return result.rows;
+  }
+
+  // Get pending users with matching address to admin
+  static async getPendingUsersByAddress(region, province, municipality) {
+    const result = await pool.query(
+      `SELECT * FROM users
+       WHERE role = 'user'
+         AND is_approved = FALSE
+         AND TRIM(region) ILIKE TRIM($1)
+         AND TRIM(province) ILIKE TRIM($2)
+         AND TRIM(municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    return result.rows;
   }
 
   static async getUserEmailById(id) {
@@ -159,6 +194,80 @@ class AdminModel {
     
     const totalCount = await pool.query(countQuery, params.slice(0, -2));
     
+    return {
+      submissions: submissions.rows,
+      total: parseInt(totalCount.rows[0].count)
+    };
+  }
+
+  // Submissions with filters and address
+  static async getSubmissionsWithAddress(
+    { month, year, status, penaltyStatus, search, limit, offset },
+    { region, province, municipality }
+  ) {
+    let query = `
+      SELECT s.submission_id, s.user_id, s.month, s.year, 
+             s.submitted_at, s.is_late, s.penalty, s.deadline,
+             s.average_guest_nights, s.average_room_occupancy_rate, s.average_guests_per_room,
+             s.receipt_number,
+             u.company_name, u.accommodation_type
+      FROM submissions s
+      JOIN users u ON s.user_id = u.user_id
+      WHERE TRIM(u.region) ILIKE TRIM($1)
+        AND TRIM(u.province) ILIKE TRIM($2)
+        AND TRIM(u.municipality) ILIKE TRIM($3)
+    `;
+    const params = [region, province, municipality];
+
+    if (month) { query += ` AND s.month = $${params.length + 1}`; params.push(month); }
+    if (year) { query += ` AND s.year = $${params.length + 1}`; params.push(year); }
+    if (status) {
+      if (status === "Late") query += ` AND s.is_late = true`;
+      else if (status === "On-Time") query += ` AND s.is_late = false`;
+    }
+    if (penaltyStatus) {
+      if (penaltyStatus === "Paid") query += ` AND s.penalty = true`;
+      else if (penaltyStatus === "Unpaid") query += ` AND s.penalty = false`;
+    }
+    if (search) {
+      query += ` AND u.company_name ILIKE $${params.length + 1}`;
+      params.push(`%${search}%`);
+    }
+
+    query += ` ORDER BY s.submitted_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const submissions = await pool.query(query, params);
+
+    // Count query for pagination
+    let countQuery = `
+      SELECT COUNT(*) 
+      FROM submissions s
+      JOIN users u ON s.user_id = u.user_id
+      WHERE TRIM(u.region) ILIKE TRIM($1)
+        AND TRIM(u.province) ILIKE TRIM($2)
+        AND TRIM(u.municipality) ILIKE TRIM($3)
+    `;
+    const countParams = [region, province, municipality];
+    let countIdx = countParams.length;
+
+    if (month) { countQuery += ` AND s.month = $${++countIdx}`; countParams.push(month); }
+    if (year) { countQuery += ` AND s.year = $${++countIdx}`; countParams.push(year); }
+    if (status) {
+      if (status === "Late") countQuery += ` AND s.is_late = true`;
+      else if (status === "On-Time") countQuery += ` AND s.is_late = false`;
+    }
+    if (penaltyStatus) {
+      if (penaltyStatus === "Paid") countQuery += ` AND s.penalty = true`;
+      else if (penaltyStatus === "Unpaid") countQuery += ` AND s.penalty = false`;
+    }
+    if (search) {
+      countQuery += ` AND u.company_name ILIKE $${++countIdx}`;
+      countParams.push(`%${search}%`);
+    }
+
+    const totalCount = await pool.query(countQuery, countParams);
+
     return {
       submissions: submissions.rows,
       total: parseInt(totalCount.rows[0].count)
@@ -282,6 +391,166 @@ class AdminModel {
       ORDER BY g.gender, age_group, g.status
     `;
     const result = await pool.query(query, [year, month]);
+    return result.rows;
+  }
+
+  // Analytics methods with address filter
+  static async getMonthlyCheckins(year, region, province, municipality) {
+    const result = await pool.query(
+      `
+      SELECT s.month, SUM(dm.check_ins) AS total_check_ins
+      FROM submissions s
+      JOIN daily_metrics dm ON s.submission_id = dm.submission_id
+      JOIN users u ON s.user_id = u.user_id
+      WHERE s.year = $1
+        AND TRIM(u.region) ILIKE TRIM($2)
+        AND TRIM(u.province) ILIKE TRIM($3)
+        AND TRIM(u.municipality) ILIKE TRIM($4)
+      GROUP BY s.month
+      ORDER BY s.month ASC
+      `,
+      [year, region, province, municipality]
+    );
+    return result.rows;
+  }
+
+  static async getMonthlyMetrics(year, region, province, municipality) {
+    const metricsResult = await pool.query(
+      `
+      WITH monthly_metrics AS (
+        SELECT 
+          s.month,
+          SUM(dm.check_ins) AS total_check_ins,
+          SUM(dm.overnight) AS total_overnight,
+          SUM(dm.occupied) AS total_occupied,
+          AVG(s.average_guest_nights) AS average_guest_nights,
+          AVG(s.average_room_occupancy_rate) AS average_room_occupancy_rate,
+          AVG(s.average_guests_per_room) AS average_guests_per_room,
+          COUNT(DISTINCT s.submission_id) AS total_submissions
+        FROM submissions s
+        LEFT JOIN daily_metrics dm ON s.submission_id = dm.submission_id
+        JOIN users u ON s.user_id = u.user_id
+        WHERE s.year = $1
+          AND TRIM(u.region) ILIKE TRIM($2)
+          AND TRIM(u.province) ILIKE TRIM($3)
+          AND TRIM(u.municipality) ILIKE TRIM($4)
+        GROUP BY s.month
+      ),
+      total_rooms AS (
+        SELECT
+          s.month,
+          SUM(s.number_of_rooms) AS total_rooms
+        FROM submissions s
+        JOIN users u ON s.user_id = u.user_id
+        WHERE s.year = $1
+          AND TRIM(u.region) ILIKE TRIM($2)
+          AND TRIM(u.province) ILIKE TRIM($3)
+          AND TRIM(u.municipality) ILIKE TRIM($4)
+        GROUP BY s.month
+      )
+      SELECT 
+        m.month,
+        m.total_check_ins,
+        m.total_overnight,
+        m.total_occupied,
+        m.average_guest_nights,
+        m.average_room_occupancy_rate,
+        m.average_guests_per_room,
+        m.total_submissions,
+        COALESCE(t.total_rooms, 0) AS total_rooms
+      FROM monthly_metrics m
+      LEFT JOIN total_rooms t ON m.month = t.month
+      ORDER BY m.month ASC;
+      `,
+      [year, region, province, municipality]
+    );
+
+    // Count users in this admin's area
+    const usersCount = await pool.query(
+      `SELECT COUNT(*) FROM users WHERE role = 'user'
+        AND TRIM(region) ILIKE TRIM($1)
+        AND TRIM(province) ILIKE TRIM($2)
+        AND TRIM(municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+
+    return {
+      metrics: metricsResult.rows,
+      totalUsers: usersCount.rows[0].count
+    };
+  }
+
+  static async getNationalityCounts(year, month, region, province, municipality) {
+    const result = await pool.query(
+      `
+      SELECT 
+        g.nationality, 
+        COUNT(*) AS count,
+        SUM(CASE WHEN g.gender = 'Male' THEN 1 ELSE 0 END) AS male_count,
+        SUM(CASE WHEN g.gender = 'Female' THEN 1 ELSE 0 END) AS female_count
+      FROM guests g
+      JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+      JOIN submissions s ON dm.submission_id = s.submission_id
+      JOIN users u ON s.user_id = u.user_id
+      WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
+        AND TRIM(u.region) ILIKE TRIM($3)
+        AND TRIM(u.province) ILIKE TRIM($4)
+        AND TRIM(u.municipality) ILIKE TRIM($5)
+      GROUP BY g.nationality
+      ORDER BY count DESC
+      `,
+      [year, month, region, province, municipality]
+    );
+    return result.rows;
+  }
+
+  static async getNationalityCountsByEstablishment(year, month, region, province, municipality) {
+    const result = await pool.query(
+      `
+      SELECT 
+        u.company_name AS establishment,
+        g.nationality, 
+        COUNT(*) AS count
+      FROM guests g
+      JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+      JOIN submissions s ON dm.submission_id = s.submission_id
+      JOIN users u ON s.user_id = u.user_id
+      WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
+        AND TRIM(u.region) ILIKE TRIM($3)
+        AND TRIM(u.province) ILIKE TRIM($4)
+        AND TRIM(u.municipality) ILIKE TRIM($5)
+      GROUP BY u.company_name, g.nationality
+      ORDER BY u.company_name ASC, g.nationality ASC
+      `,
+      [year, month, region, province, municipality]
+    );
+    return result.rows;
+  }
+
+  static async getGuestDemographics(year, month, region, province, municipality) {
+    const result = await pool.query(
+      `
+      SELECT 
+        g.gender,
+        CASE 
+          WHEN g.age < 18 THEN 'Minors'
+          ELSE 'Adults'
+        END AS age_group,
+        g.status,
+        COUNT(*) AS count
+      FROM guests g
+      JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+      JOIN submissions s ON dm.submission_id = s.submission_id
+      JOIN users u ON s.user_id = u.user_id
+      WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
+        AND TRIM(u.region) ILIKE TRIM($3)
+        AND TRIM(u.province) ILIKE TRIM($4)
+        AND TRIM(u.municipality) ILIKE TRIM($5)
+      GROUP BY g.gender, age_group, g.status
+      ORDER BY g.gender, age_group, g.status
+      `,
+      [year, month, region, province, municipality]
+    );
     return result.rows;
   }
 }
