@@ -88,5 +88,13 @@ router.get(
   adminController.getPendingUsers
 );
 
+// Storage usage
+router.get(
+  '/storage-usage',
+  authenticateToken,
+  requireAdmin,
+  adminController.getStorageUsage
+);
+
 module.exports = router;
 

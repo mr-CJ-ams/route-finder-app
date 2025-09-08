@@ -64,6 +64,7 @@ import UserApproval from "./UserApproval";
 import SubmissionOverview from "./SubmissionOverview";
 import MainDashboard from "./MainDashboard";
 import AdminSidebar from "../components/AdminSidebar";
+import StorageUsage from "./StorageUsage";
 import '../../components/MenuButton.css';
 
 interface User {
@@ -344,6 +345,9 @@ const AdminDashboard = () => {
                 calculateMetrics={calculateMetrics}
                 activeSection={activeSection}
               />
+            )}
+            {activeSection === "storage-usage" && (
+              <StorageUsage API_BASE_URL={API_BASE_URL} />
             )}
           </div>
         </div>

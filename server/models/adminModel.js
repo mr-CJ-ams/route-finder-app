@@ -553,6 +553,136 @@ class AdminModel {
     );
     return result.rows;
   }
+
+  // Get storage usage for tables, filtered by admin's address
+  static async getStorageUsage(region, province, municipality) {
+    const pool = require("../db");
+
+    // Get row counts for each table filtered by address
+    const userCount = await pool.query(
+      `SELECT COUNT(*) FROM users WHERE TRIM(region) ILIKE TRIM($1) AND TRIM(province) ILIKE TRIM($2) AND TRIM(municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    const totalUserCount = await pool.query(`SELECT COUNT(*) FROM users`);
+    const submissionCount = await pool.query(
+      `SELECT COUNT(*) FROM submissions s JOIN users u ON s.user_id = u.user_id
+       WHERE TRIM(u.region) ILIKE TRIM($1) AND TRIM(u.province) ILIKE TRIM($2) AND TRIM(u.municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    const totalSubmissionCount = await pool.query(`SELECT COUNT(*) FROM submissions`);
+    const dailyMetricsCount = await pool.query(
+      `SELECT COUNT(*) FROM daily_metrics dm JOIN submissions s ON dm.submission_id = s.submission_id
+       JOIN users u ON s.user_id = u.user_id
+       WHERE TRIM(u.region) ILIKE TRIM($1) AND TRIM(u.province) ILIKE TRIM($2) AND TRIM(u.municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    const totalDailyMetricsCount = await pool.query(`SELECT COUNT(*) FROM daily_metrics`);
+    const guestsCount = await pool.query(
+      `SELECT COUNT(*) FROM guests g
+       JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+       JOIN submissions s ON dm.submission_id = s.submission_id
+       JOIN users u ON s.user_id = u.user_id
+       WHERE TRIM(u.region) ILIKE TRIM($1) AND TRIM(u.province) ILIKE TRIM($2) AND TRIM(u.municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    const totalGuestsCount = await pool.query(`SELECT COUNT(*) FROM guests`);
+    const draftSubmissionsCount = await pool.query(
+      `SELECT COUNT(*) FROM draft_submissions ds
+       JOIN users u ON ds.user_id = u.user_id
+       WHERE TRIM(u.region) ILIKE TRIM($1) AND TRIM(u.province) ILIKE TRIM($2) AND TRIM(u.municipality) ILIKE TRIM($3)`,
+      [region, province, municipality]
+    );
+    const totalDraftSubmissionsCount = await pool.query(`SELECT COUNT(*) FROM draft_submissions`);
+
+    // Get table sizes (total, not filtered)
+    const tableSizes = await pool.query(`
+      SELECT name, size, bytes
+      FROM (
+          SELECT 
+              table_name AS name,
+              pg_size_pretty(pg_total_relation_size(table_name::regclass)) AS size,
+              pg_total_relation_size(table_name::regclass) AS bytes,
+              1 AS sort_order
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+
+          UNION ALL
+
+          SELECT 
+              'TOTAL DATABASE SIZE' AS name,
+              pg_size_pretty(pg_database_size(current_database())) AS size,
+              pg_database_size(current_database()) AS bytes,
+              2 AS sort_order
+      ) AS combined
+      ORDER BY 
+          sort_order,
+          bytes DESC NULLS LAST;
+    `);
+
+    let totalEstimatedBytes = 0;
+
+    const withCounts = tableSizes.rows.map(row => {
+      let row_count = null, total_count = null, estimated_bytes = null, estimated_size = null;
+      if (row.name === "users") {
+        row_count = userCount.rows[0].count;
+        total_count = totalUserCount.rows[0].count;
+        estimated_bytes = total_count > 0 ? Math.round((row_count / total_count) * row.bytes) : 0;
+      }
+      if (row.name === "submissions") {
+        row_count = submissionCount.rows[0].count;
+        total_count = totalSubmissionCount.rows[0].count;
+        estimated_bytes = total_count > 0 ? Math.round((row_count / total_count) * row.bytes) : 0;
+      }
+      if (row.name === "daily_metrics") {
+        row_count = dailyMetricsCount.rows[0].count;
+        total_count = totalDailyMetricsCount.rows[0].count;
+        estimated_bytes = total_count > 0 ? Math.round((row_count / total_count) * row.bytes) : 0;
+      }
+      if (row.name === "guests") {
+        row_count = guestsCount.rows[0].count;
+        total_count = totalGuestsCount.rows[0].count;
+        estimated_bytes = total_count > 0 ? Math.round((row_count / total_count) * row.bytes) : 0;
+      }
+      if (row.name === "draft_submissions") {
+        row_count = draftSubmissionsCount.rows[0].count;
+        total_count = totalDraftSubmissionsCount.rows[0].count;
+        estimated_bytes = total_count > 0 ? Math.round((row_count / total_count) * row.bytes) : 0;
+      }
+      if (estimated_bytes !== null) {
+        totalEstimatedBytes += estimated_bytes;
+        estimated_size = estimated_bytes > 0 ? 
+          (estimated_bytes / 1024 < 1024
+            ? `${(estimated_bytes / 1024).toFixed(1)} kB`
+            : `${(estimated_bytes / 1024 / 1024).toFixed(1)} MB`)
+          : "0 kB";
+      }
+      return {
+        name: row.name,
+        estimated_size: estimated_size ?? undefined
+      };
+    });
+
+    // Filter out 'draft_stays' and 'TOTAL DATABASE SIZE'
+    const filtered = withCounts.filter(
+      row =>
+        row.name !== "draft_stays" &&
+        row.name !== "TOTAL DATABASE SIZE"
+    );
+
+    // Add total row for estimated size (your area)
+    let totalEstimatedSize = totalEstimatedBytes > 0
+      ? (totalEstimatedBytes / 1024 < 1024
+          ? `${(totalEstimatedBytes / 1024).toFixed(1)} kB`
+          : `${(totalEstimatedBytes / 1024 / 1024).toFixed(1)} MB`)
+      : "0 kB";
+
+    filtered.push({
+      name: "TOTAL (Your Area)",
+      estimated_size: totalEstimatedSize
+    });
+
+    return filtered;
+  }
 }
 
 module.exports = AdminModel;

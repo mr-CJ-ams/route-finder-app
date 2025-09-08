@@ -272,3 +272,16 @@ exports.getPendingUsers = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// Get storage usage statistics
+exports.getStorageUsage = async (req, res) => {
+  try {
+    const adminId = req.user.user_id;
+    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+    const usage = await AdminModel.getStorageUsage(region, province, municipality);
+    res.json(usage);
+  } catch (err) {
+    console.error("Error fetching storage usage:", err);
+    res.status(500).json({ error: "Failed to fetch storage usage" });
+  }
+};

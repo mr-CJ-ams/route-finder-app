@@ -34,7 +34,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const navItems: NavItem[] = [
     { id: "dashboard", label: "Main Dashboard", icon: "bi-house", ariaLabel: "Main Dashboard" },
     { id: "user-approval", label: "User Approval", icon: "bi-people", ariaLabel: "User Approval" },
-    { id: "submission-overview", label: "Submission Overview", icon: "bi-file-earmark-text", ariaLabel: "Submission Overview" }
+    { id: "submission-overview", label: "Submission Overview", icon: "bi-file-earmark-text", ariaLabel: "Submission Overview" },
+    { id: "storage-usage", label: "Storage Usage", icon: "bi-hdd-stack", ariaLabel: "Storage Usage" }
   ];
 
   const renderNavLink = (item: NavItem, isMobile: boolean = false) => (
