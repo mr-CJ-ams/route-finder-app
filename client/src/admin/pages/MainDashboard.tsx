@@ -67,6 +67,10 @@ import GuestDemographics from "../components/GuestDemographics";
 import NationalityCounts from "../components/NationalityCounts";
 import RegionalDistribution from "../components/RegionalDistribution";
 
+interface MainDashboardProps {
+  user?: { role: string };
+  adminMunicipality: string; // <-- Add this prop
+}
 
 interface CheckInData {
   month: number;
@@ -119,13 +123,7 @@ const predictedData2025: CheckInData[] = [
   { month: 12, total_check_ins: 0, isPredicted: true },
 ];
 
-interface MainDashboardProps {
-  user?: {
-    role: string;
-  };
-}
-
-const MainDashboard = ({ user }: MainDashboardProps) => {
+const MainDashboard = ({ user, adminMunicipality }: MainDashboardProps) => {
   const [monthlyCheckIns, setMonthlyCheckIns] = useState<CheckInData[]>([]);
   const [monthlyMetrics, setMonthlyMetrics] = useState<MonthlyMetric[]>([]);
   const [nationalityCounts, setNationalityCounts] = useState<NationalityCount[]>([]);
@@ -214,7 +212,7 @@ const MainDashboard = ({ user }: MainDashboardProps) => {
 
   return (
     <div>
-      <h2>Main Dashboard</h2>
+      <h2>{adminMunicipality} Main Dashboard</h2>
       <Filters
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
@@ -229,6 +227,7 @@ const MainDashboard = ({ user }: MainDashboardProps) => {
           monthlyCheckIns={monthlyCheckIns}
           selectedYear={selectedYear}
           formatMonth={formatMonth}
+          adminMunicipality={adminMunicipality}
         />
       )}
       <MonthlyMetrics
@@ -236,12 +235,14 @@ const MainDashboard = ({ user }: MainDashboardProps) => {
         selectedYear={selectedYear}
         formatMonth={formatMonth}
         toNumber={toNumber}
+        adminMunicipality={adminMunicipality}
       />
       <GuestDemographics
         guestDemographics={guestDemographics}
         selectedYear={selectedYear}
         selectedMonth={selectedMonth}
         formatMonth={formatMonth}
+        adminMunicipality={adminMunicipality}
       />
       <RegionalDistribution
         nationalityCounts={nationalityCounts}
@@ -249,12 +250,14 @@ const MainDashboard = ({ user }: MainDashboardProps) => {
         selectedMonth={selectedMonth}
         formatMonth={formatMonth}
         user={user}
+        adminMunicipality={adminMunicipality}
       />
       <NationalityCounts
         nationalityCounts={nationalityCounts}
         selectedYear={selectedYear}
         selectedMonth={selectedMonth}
         formatMonth={formatMonth}
+        adminMunicipality={adminMunicipality}
       />
     </div>
   );

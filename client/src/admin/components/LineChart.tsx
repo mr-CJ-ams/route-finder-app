@@ -12,12 +12,14 @@ interface LineChartComponentProps {
   monthlyCheckIns: MonthlyCheckIn[];
   selectedYear: number;
   formatMonth: (month: number) => string;
+  adminMunicipality: string; // Added prop for municipality
 }
 
 const LineChartComponent: React.FC<LineChartComponentProps> = ({ 
   monthlyCheckIns, 
   selectedYear, 
-  formatMonth 
+  formatMonth,
+  adminMunicipality, // Destructure municipality prop
 }) => {
   // Memoize predicted data to avoid filtering on every render
   const predictedData = useMemo(
@@ -55,6 +57,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
 
   return (
     <div>
+      <h3>{adminMunicipality} Monthly Arrivals</h3> {/* Municipality title */}
       {/* Make chart horizontally scrollable on mobile, with a minimum width for all months */}
       <div style={{ width: "100%", overflowX: "auto" }}>
         <div style={{ minWidth: 700, width: "100%" }}>

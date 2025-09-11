@@ -70,6 +70,7 @@ interface GuestDemographicsProps {
   selectedYear: number;
   selectedMonth: number;
   formatMonth: (month: number) => string;
+  adminMunicipality: string; // <-- Add this prop
 }
 
 interface Totals {
@@ -90,7 +91,8 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
   guestDemographics,
   selectedYear,
   selectedMonth,
-  formatMonth
+  formatMonth,
+  adminMunicipality // <-- Use this prop
 }) => {
   const calculateTotals = (): Totals => {
     const totals: Totals = { 
@@ -133,7 +135,7 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
     ];
 
     const detailedSheet = XLSX.utils.aoa_to_sheet([
-      ["Panglao Report of Guest Demographics", "", "", ""],
+      [`${adminMunicipality} Report of Guest Demographics`, "", "", ""],
       ["Year", selectedYear, "", ""],
       ["Month", formatMonth(selectedMonth), "", ""],
       ["Gender", "AgeGroup", "Status", "Count"],
@@ -143,7 +145,7 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
     detailedSheet["!cols"] = Array(4).fill({ wch: 15 });
 
     const summarySheet = XLSX.utils.aoa_to_sheet([
-      ["Panglao Report of Guest Demographics", "", "", ""],
+      [`${adminMunicipality} Report of Guest Demographics`, "", "", ""],
       ["Year", selectedYear, "", ""],
       ["Month", formatMonth(selectedMonth), "", ""],
       ["Category", "Total", "", ""],
@@ -156,8 +158,10 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
     XLSX.utils.book_append_sheet(wb, detailedSheet, "Detailed Data");
     XLSX.utils.book_append_sheet(wb, summarySheet, "Summary Data");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([buf], { type: "application/octet-stream" }), 
-      `Guest_Demographics_${selectedYear}_${selectedMonth}.xlsx`);
+    saveAs(
+      new Blob([buf], { type: "application/octet-stream" }),
+      `Guest_Demographics_${adminMunicipality}_${selectedYear}_${selectedMonth}.xlsx`
+    );
   };
 
   const totals = calculateTotals();
@@ -172,7 +176,9 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
 
   return (
     <div style={{ padding: 20, backgroundColor: "#E0F7FA" }}>
-      <h3 style={{ color: "#37474F", marginBottom: 20 }}>Guest Demographics of Guest Check-Ins</h3>
+      <h3 style={{ color: "#37474F", marginBottom: 20 }}>
+        Guest Demographics of Guest Check-Ins ({adminMunicipality})
+      </h3>
       <button
         style={{
           backgroundColor: "#00BCD4", 
@@ -185,11 +191,11 @@ const GuestDemographics: React.FC<GuestDemographicsProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "8px", // space between icon and text
+          gap: "8px",
         }}
         onClick={exportGuestDemographics}
       >
-        <Download size={16}/>Guest Demographics
+        <Download size={16}/>Export Guest Demographics
       </button>
       <div style={{ marginBottom: 20 }}>
         <h4 style={{ color: "#00BCD4", marginBottom: 10 }}>Summary</h4>

@@ -28,6 +28,7 @@ interface UserApprovalProps {
   setSelectedUserId: (userId: string | null) => void;
   declineUser: (userId: string) => void;
   setDeclineMessage: (message: string) => void;
+  adminMunicipality: string; // <-- Add this prop
 }
 
 const UserApproval = ({
@@ -38,6 +39,7 @@ const UserApproval = ({
   setSelectedUserId,
   declineUser,
   setDeclineMessage,
+  adminMunicipality
 }: UserApprovalProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "pending" | "approved">("all");
@@ -205,7 +207,9 @@ const UserApproval = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white p-8">
-      <h2 className="text-3xl font-semibold text-sky-900 mb-8">User Approval</h2>
+      <h2 className="text-3xl font-semibold text-sky-900 mb-8">
+        {adminMunicipality} User Approval
+      </h2>
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />

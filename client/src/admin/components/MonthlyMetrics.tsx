@@ -74,13 +74,15 @@ interface MonthlyMetricsProps {
   selectedYear: number;
   formatMonth: (month: number) => string;
   toNumber: (value: number | string) => number;
+  adminMunicipality: string; // <-- Add this prop
 }
 
 const MonthlyMetrics: React.FC<MonthlyMetricsProps> = ({
   monthlyMetrics,
   selectedYear,
   formatMonth,
-  toNumber
+  toNumber,
+  adminMunicipality
 }) => {
   const exportMonthlyMetrics = () => {
     const worksheet = XLSX.utils.json_to_sheet(
@@ -98,9 +100,12 @@ const MonthlyMetrics: React.FC<MonthlyMetricsProps> = ({
       }))
     );
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, worksheet, "Monthly Metrics");
+    XLSX.utils.book_append_sheet(wb, worksheet, `${adminMunicipality} Monthly Metrics`);
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([buf], { type: "application/octet-stream" }), `Monthly_Metrics_${selectedYear}.xlsx`);
+    saveAs(
+      new Blob([buf], { type: "application/octet-stream" }),
+      `Monthly_Metrics_${adminMunicipality}_${selectedYear}.xlsx`
+    );
   };
 
   return (

@@ -11,12 +11,13 @@ interface AdminSidebarProps {
   handleLogout: () => void;
 }
 
-const AdminSidebar: React.FC<AdminSidebarProps> = ({
+const AdminSidebar: React.FC<AdminSidebarProps & { adminMunicipality: string }> = ({
   open,
   setOpen,
   activeSection,
   setActiveSection,
-  handleLogout
+  handleLogout,
+  adminMunicipality
 }) => {
   const handleNav = (section: string) => {
     setActiveSection(section);
@@ -114,7 +115,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
           fontSize: "1.1rem", 
           letterSpacing: "0.5px" 
         }}>
-          Panglao Tourist Data Management System
+          {adminMunicipality} Tourist Data Management System
         </h4>
         <ul className="nav flex-column">
           {navItems.map(item => renderNavLink(item, true))}
@@ -166,7 +167,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
             fontSize: "1.25rem", 
             letterSpacing: "0.5px" 
           }}>
-            Panglao Tourist Data Management System
+            {adminMunicipality} Tourist Data Management System
           </h4>
           <ul className="nav flex-column">
             {navItems.map(item => renderNavLink(item))}

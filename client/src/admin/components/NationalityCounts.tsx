@@ -70,11 +70,12 @@ interface NationalityCountsProps {
   formatMonth: (month: number) => string;
 }
 
-const NationalityCounts: React.FC<NationalityCountsProps> = ({
+const NationalityCounts: React.FC<NationalityCountsProps & { adminMunicipality: string }> = ({
   nationalityCounts,
   selectedYear,
   selectedMonth,
-  formatMonth
+  formatMonth,
+  adminMunicipality
 }) => {
   const exportNationalityCounts = () => {
     const worksheet = XLSX.utils.json_to_sheet(
@@ -90,7 +91,7 @@ const NationalityCounts: React.FC<NationalityCountsProps> = ({
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     saveAs(
       new Blob([buf], { type: "application/octet-stream" }),
-      `Nationality_Counts_${selectedYear}_${formatMonth(selectedMonth)}.xlsx`
+      `Nationality_Counts_${adminMunicipality}_${selectedYear}_${formatMonth(selectedMonth)}.xlsx`
     );
   };
 

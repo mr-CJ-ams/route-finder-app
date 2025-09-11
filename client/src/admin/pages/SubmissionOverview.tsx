@@ -118,6 +118,7 @@ interface SubmissionOverviewProps {
   setShowSubmissionModal: (show: boolean) => void;
   calculateMetrics: (submission: Submission) => Metrics;
   activeSection: string;
+  adminMunicipality: string; // <-- Add this prop
 }
 
 interface Filters {
@@ -139,6 +140,7 @@ const SubmissionOverview: React.FC<SubmissionOverviewProps> = ({
   setShowSubmissionModal,
   calculateMetrics,
   activeSection,
+  adminMunicipality
 }) => {
   const [filters, setFilters] = useState<Filters>({ 
     month: "", 
@@ -430,11 +432,11 @@ const SubmissionOverview: React.FC<SubmissionOverviewProps> = ({
         if (g.isCheckIn) nationalityCounts[g.nationality] = (nationalityCounts[g.nationality] || 0) + 1;
       })
     );
-    
+
     const nationalityData = [
       ["Year", "=", selectedSubmission.year],
       ["Month", "=", getMonthName(selectedSubmission.month)],
-      ["(PANGLAO REPORT)", selectedSubmission.company_name || "Resort"],
+      [`(${adminMunicipality} REPORT)`, selectedSubmission.company_name || "Resort"], // <-- Dynamic
       [""], // Empty row for spacing
       ["COUNTRY OF RESIDENCE"],
       ["TOTAL PHILIPPINE RESIDENTS", "=", nationalityCounts["Philippines"] || 0],
@@ -577,7 +579,7 @@ const SubmissionOverview: React.FC<SubmissionOverviewProps> = ({
     
     saveAs(
       new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/octet-stream" }),
-      `${selectedSubmission.company_name || 'Resort'}_${getMonthName(selectedSubmission.month)}_${selectedSubmission.year}_Tourist_Arrival_Report.xlsx`
+      `${selectedSubmission.company_name || adminMunicipality}_${getMonthName(selectedSubmission.month)}_${selectedSubmission.year}_Tourist_Arrival_Report.xlsx`
     );
   };
 

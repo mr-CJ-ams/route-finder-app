@@ -56,6 +56,7 @@
 
 const AdminModel = require("../models/adminModel");
 const { sendEmailNotification } = require("../utils/email");
+const db = require("../db"); // Make sure db is imported!
 
 // Get all users with role 'user' and matching address to admin
 exports.getUsers = async (req, res) => {
@@ -283,5 +284,20 @@ exports.getStorageUsage = async (req, res) => {
   } catch (err) {
     console.error("Error fetching storage usage:", err);
     res.status(500).json({ error: "Failed to fetch storage usage" });
+  }
+};
+
+// Get admin profile
+exports.getAdminProfile = async (req, res) => {
+  try {
+    const adminId = req.user.user_id;
+    const result = await db.query(
+      `SELECT user_id, email, role, region, province, municipality, company_name FROM users WHERE user_id = $1`,
+      [adminId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "Admin not found" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
   }
 };

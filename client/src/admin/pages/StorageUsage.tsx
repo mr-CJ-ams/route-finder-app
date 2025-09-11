@@ -17,7 +17,13 @@ const accentColors: Record<string, string> = {
     "bg-gradient-to-r from-emerald-200 to-emerald-100 text-emerald-900 font-bold shadow-inner",
 };
 
-const StorageUsage = ({ API_BASE_URL }: { API_BASE_URL: string }) => {
+const StorageUsage = ({
+  API_BASE_URL,
+  adminMunicipality,
+}: {
+  API_BASE_URL: string;
+  adminMunicipality: string;
+}) => {
   const [usage, setUsage] = useState<StorageRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +53,7 @@ const StorageUsage = ({ API_BASE_URL }: { API_BASE_URL: string }) => {
             <Database size={32} className="text-cyan-600" />
           </div>
           <h2 className="text-2xl md:text-3xl font-bold text-sky-900 tracking-tight drop-shadow-sm">
-            Database Storage Usage
+            {adminMunicipality} Database Storage Usage
           </h2>
         </div>
         <div className="bg-white/95 rounded-2xl shadow-xl p-6 md:p-10 border border-sky-100 backdrop-blur-sm">

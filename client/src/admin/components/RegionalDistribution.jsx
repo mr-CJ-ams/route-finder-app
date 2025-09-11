@@ -64,7 +64,14 @@ import { Download } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-const RegionalDistribution = ({ nationalityCounts, selectedYear, selectedMonth, formatMonth, user }) => {
+const RegionalDistribution = ({
+  nationalityCounts,
+  selectedYear,
+  selectedMonth,
+  formatMonth,
+  user,
+  adminMunicipality // <-- Add this prop
+}) => {
   const [establishmentData, setEstablishmentData] = React.useState([]);
 
   React.useEffect(() => {
@@ -99,7 +106,7 @@ const RegionalDistribution = ({ nationalityCounts, selectedYear, selectedMonth, 
     worksheetData.push(["REGIONAL DISTRIBUTION OF TRAVELLERS"]);
     worksheetData.push(["Year =", selectedYear]);
     worksheetData.push(["Month =", getMonthName(selectedMonth)]);
-    worksheetData.push(["(PANGLAO REPORT)"]);
+    worksheetData.push([`(${adminMunicipality} REPORT)`]); // <-- Dynamic
     worksheetData.push([]);
 
     // Add Philippine and Non-Philippine Residents
@@ -173,7 +180,7 @@ const RegionalDistribution = ({ nationalityCounts, selectedYear, selectedMonth, 
         sheetData.push(["REGIONAL DISTRIBUTION OF TRAVELLERS", ...Array(chunk.length).fill("")]);
         sheetData.push(["Year =", selectedYear, ...Array(chunk.length - 1).fill("")]);
         sheetData.push(["Month =", formatMonth(selectedMonth), ...Array(chunk.length - 1).fill("")]);
-        sheetData.push(["(PANGLAO REPORT)", ...chunk]);
+        sheetData.push([`(${adminMunicipality} REPORT)`, ...chunk]); // <-- Dynamic
         sheetData.push([]);
         sheetData.push(["COUNTRY OF RESIDENCE", ...Array(chunk.length).fill("")]);
         sheetData.push([
@@ -273,7 +280,7 @@ const RegionalDistribution = ({ nationalityCounts, selectedYear, selectedMonth, 
     // Export to Excel
     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(blob, `Regional_Distribution_${selectedYear}_${formatMonth(selectedMonth)}.xlsx`);
+    saveAs(blob, `Regional_Distribution_${adminMunicipality}_${selectedYear}_${formatMonth(selectedMonth)}.xlsx`);
   };
 
   return (

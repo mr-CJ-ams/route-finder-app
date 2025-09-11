@@ -376,7 +376,7 @@ const SubmissionDetails = ({ submissionId }) => {
     const nationalityData = [
       ["Year", "=", submission.year],
       ["Month", "=", new Date(0, submission.month - 1).toLocaleString("default", { month: "long" })],
-      ["(PANGLAO REPORT)", submission.company_name || "Resort"],
+      ["(" + (submission.municipality || "Tourism") + " REPORT)", submission.company_name || "Resort"],
       [""], // Empty row for spacing
       ["COUNTRY OF RESIDENCE"],
       ["TOTAL PHILIPPINE RESIDENTS", "=", nationalityCounts["Philippines"] || 0],
@@ -519,7 +519,7 @@ const SubmissionDetails = ({ submissionId }) => {
     
     saveAs(
       new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/octet-stream" }),
-      `${submission.company_name || 'Resort'}_${new Date(0, submission.month - 1).toLocaleString("default", { month: "long" })}_${submission.year}_Tourist_Arrival_Report.xlsx`
+      `${submission.company_name || (submission.municipality || "Tourism")}_${new Date(0, submission.month - 1).toLocaleString("default", { month: "long" })}_${submission.year}_Tourist_Arrival_Report.xlsx`
     );
   };
 

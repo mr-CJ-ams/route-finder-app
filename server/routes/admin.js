@@ -53,7 +53,6 @@
 const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/adminController");
-const { getAutoApproval, setAutoApproval } = require("../utils/autoApproval");
 const { authenticateToken, requireAdmin } = require("../middleware/auth");
 
 // User management
@@ -95,6 +94,9 @@ router.get(
   requireAdmin,
   adminController.getStorageUsage
 );
+
+// Admin profile
+router.get("/me", authenticateToken, requireAdmin, adminController.getAdminProfile);
 
 module.exports = router;
 
