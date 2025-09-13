@@ -244,7 +244,20 @@ exports.login = async (req, res) => {
     if (!validPassword) return res.status(400).json("Invalid credentials");
     if (!user.is_approved) return res.status(400).json("Waiting for admin approval");
     if (!user.is_active) return res.status(400).json("Account is deactivated");
-    const token = jwt.sign({ user_id: user.user_id, role: user.role }, process.env.JWT_SECRET);
+    
+    // UPDATED: Include address information in JWT
+    const token = jwt.sign(
+      { 
+        user_id: user.user_id, 
+        role: user.role,
+        region: user.region,           // ← ADD THIS
+        province: user.province,       // ← ADD THIS  
+        municipality: user.municipality // ← ADD THIS
+      }, 
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+    
     res.json({ token, user });
   } catch (err) {
     console.error(err.message);

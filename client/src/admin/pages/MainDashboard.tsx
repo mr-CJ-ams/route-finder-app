@@ -57,7 +57,6 @@
  * Author: Carlojead Amaquin
  * Date: [2025-08-21]
  */
-
 import { useState, useEffect } from "react";
 import axios from "axios";
 import Filters from "../components/Filters";
@@ -69,7 +68,9 @@ import RegionalDistribution from "../components/RegionalDistribution";
 
 interface MainDashboardProps {
   user?: { role: string };
-  adminMunicipality: string; // <-- Add this prop
+  adminMunicipality: string;
+  adminRegion?: string;      // ← ADD THIS PROP
+  adminProvince?: string;    // ← ADD THIS PROP
 }
 
 interface CheckInData {
@@ -99,7 +100,6 @@ interface NationalityCount {
 }
 
 interface DemographicData {
-  // Define the structure based on your actual data
   age_group: string;
   gender: string;
   status: string;
@@ -123,7 +123,12 @@ const predictedData2025: CheckInData[] = [
   { month: 12, total_check_ins: 0, isPredicted: true },
 ];
 
-const MainDashboard = ({ user, adminMunicipality }: MainDashboardProps) => {
+const MainDashboard = ({ 
+  user, 
+  adminMunicipality, 
+  adminRegion,      // ← ADD THESE PROPS
+  adminProvince     // ← ADD THESE PROPS
+}: MainDashboardProps) => {
   const [monthlyCheckIns, setMonthlyCheckIns] = useState<CheckInData[]>([]);
   const [monthlyMetrics, setMonthlyMetrics] = useState<MonthlyMetric[]>([]);
   const [nationalityCounts, setNationalityCounts] = useState<NationalityCount[]>([]);
@@ -137,23 +142,24 @@ const MainDashboard = ({ user, adminMunicipality }: MainDashboardProps) => {
     const fetchData = async () => {
       try {
         const token = sessionStorage.getItem("token");
-        const [checkInsRes, metricsRes, nationalityRes, demographicsRes] = await Promise.all([
-          axios.get<CheckInData[]>(`${API_BASE_URL}/admin/monthly-checkins`, { 
-            headers: { Authorization: `Bearer ${token}` }, 
-            params: { year: selectedYear } 
-          }),
-          axios.get<MonthlyMetric[]>(`${API_BASE_URL}/admin/monthly-metrics`, { 
-            headers: { Authorization: `Bearer ${token}` }, 
-            params: { year: selectedYear } 
-          }),
-          axios.get<NationalityCount[]>(`${API_BASE_URL}/admin/nationality-counts`, { 
-            headers: { Authorization: `Bearer ${token}` }, 
-            params: { year: selectedYear, month: selectedMonth } 
-          }),
-          axios.get<DemographicData[]>(`${API_BASE_URL}/admin/guest-demographics`, { 
-            headers: { Authorization: `Bearer ${token}` }, 
-            params: { year: selectedYear, month: selectedMonth } 
-          }),
+        // Always include year and month
+        const params: any = {
+          year: selectedYear,
+          month: selectedMonth,
+        };
+        
+        // If user is not admin, add address params if available
+        if (user && user.role !== "admin") {
+          if (adminRegion) params.region = adminRegion;
+          if (adminProvince) params.province = adminProvince;
+          if (adminMunicipality) params.municipality = adminMunicipality;
+        }
+        
+        const [checkInsRes, metricsRes, natCountsRes, demoRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/admin/monthly-checkins`, { params, headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE_URL}/admin/monthly-metrics`, { params, headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE_URL}/admin/nationality-counts`, { params, headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE_URL}/admin/guest-demographics`, { params, headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
         const allMonths = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -192,8 +198,9 @@ const MainDashboard = ({ user, adminMunicipality }: MainDashboardProps) => {
           ])
         );
         
-        setNationalityCounts(nationalityRes.data);
-        setGuestDemographics(demographicsRes.data);
+        // FIX THESE VARIABLE NAMES:
+        setNationalityCounts(natCountsRes.data);  // ← FIXED: nationalityRes → natCountsRes
+        setGuestDemographics(demoRes.data);       // ← FIXED: demographicsRes → demoRes
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
       } finally {
@@ -202,7 +209,7 @@ const MainDashboard = ({ user, adminMunicipality }: MainDashboardProps) => {
     };
 
     fetchData();
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, user, adminMunicipality, adminRegion, adminProvince]);
 
   const formatMonth = (m: number): string => 
     new Date(2023, m - 1).toLocaleString("default", { month: "long" });

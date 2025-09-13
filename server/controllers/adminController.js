@@ -58,11 +58,24 @@ const AdminModel = require("../models/adminModel");
 const { sendEmailNotification } = require("../utils/email");
 const db = require("../db"); // Make sure db is imported!
 
+async function getFilterAddress(req) {
+  if (req.user.role === 'admin') {
+    return await AdminModel.getAdminAddress(req.user.user_id);
+  } else {
+    // For users, use their own address from JWT
+    return {
+      region: req.user.region,
+      province: req.user.province,
+      municipality: req.user.municipality
+    };
+  }
+}
+
 // Get all users with role 'user' and matching address to admin
 exports.getUsers = async (req, res) => {
   try {
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
+    // const adminId = req.user.user_id;
+    const { region, province, municipality } = await getFilterAddress(req);
     const users = await AdminModel.getUsersByAddress(region, province, municipality);
     res.json(users);
   } catch (err) {
@@ -184,9 +197,7 @@ exports.getSubmissions = async (req, res) => {
 exports.getMonthlyCheckins = async (req, res) => {
   try {
     const { year } = req.query;
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
-
+    const { region, province, municipality } = await getFilterAddress(req);
     const result = await AdminModel.getMonthlyCheckins(year, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -199,10 +210,13 @@ exports.getMonthlyCheckins = async (req, res) => {
 exports.getMonthlyMetrics = async (req, res) => {
   try {
     const { year } = req.query;
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
-
-    const { metrics, totalUsers } = await AdminModel.getMonthlyMetrics(year, region, province, municipality);
+    const { region, province, municipality } = await getFilterAddress(req);
+    const { metrics, totalUsers } = await AdminModel.getMonthlyMetrics(
+      year,
+      region,
+      province,
+      municipality
+    );
 
     const metricsWithSubmissionRate = metrics.map((row) => ({
       ...row,
@@ -220,9 +234,7 @@ exports.getMonthlyMetrics = async (req, res) => {
 exports.getNationalityCounts = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
-
+    const { region, province, municipality } = await getFilterAddress(req);
     const result = await AdminModel.getNationalityCounts(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -235,9 +247,7 @@ exports.getNationalityCounts = async (req, res) => {
 exports.getNationalityCountsByEstablishment = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
-
+    const { region, province, municipality } = await getFilterAddress(req);
     const result = await AdminModel.getNationalityCountsByEstablishment(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -250,9 +260,7 @@ exports.getNationalityCountsByEstablishment = async (req, res) => {
 exports.getGuestDemographics = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const adminId = req.user.user_id;
-    const { region, province, municipality } = await AdminModel.getAdminAddress(adminId);
-
+    const { region, province, municipality } = await getFilterAddress(req);
     const result = await AdminModel.getGuestDemographics(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {

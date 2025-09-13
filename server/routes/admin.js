@@ -71,13 +71,15 @@ router.post("/auto-approval", authenticateToken, requireAdmin, (req, res) => {
   res.json({ enabled: getAutoApproval() });
 });
 
-// Submissions and metrics
-router.get("/submissions", authenticateToken, requireAdmin, adminController.getSubmissions);
+// Change these routes to allow both admin and user access
 router.get("/monthly-checkins", authenticateToken, adminController.getMonthlyCheckins);
 router.get("/monthly-metrics", authenticateToken, adminController.getMonthlyMetrics);
 router.get("/nationality-counts", authenticateToken, adminController.getNationalityCounts);
-router.get("/nationality-counts-by-establishment", authenticateToken, requireAdmin, adminController.getNationalityCountsByEstablishment);
 router.get("/guest-demographics", authenticateToken, adminController.getGuestDemographics);
+
+// Keep admin-only restrictions for these sensitive endpoints
+router.get("/nationality-counts-by-establishment", authenticateToken, requireAdmin, adminController.getNationalityCountsByEstablishment);
+router.get("/submissions", authenticateToken, requireAdmin, adminController.getSubmissions);
 
 // Pending users
 router.get(

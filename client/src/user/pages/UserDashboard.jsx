@@ -135,7 +135,14 @@ const UserDashboard = () => {
               {activeSection === "submission-history" && <SubmissionHistory user={user} />}
               {activeSection === "user-statistics" && <UserStatistics user={user} />}
               {activeSection === "profile-management" && <ProfileSection user={user} onUpdateRooms={handleUpdateRooms} />}
-              {activeSection === "admin-dashboard" && <MainDashboard user={user} />}
+              {activeSection === "admin-dashboard" && user && (
+                <MainDashboard
+                  user={user}
+                  adminMunicipality={user.municipality}
+                  adminRegion={user.region}
+                  adminProvince={user.province}
+                />
+              )}
               {activeSection === "help-support" && <HelpSupport />}
             </div>
           </div>
