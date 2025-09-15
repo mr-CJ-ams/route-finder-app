@@ -81,6 +81,8 @@ router.get("/guest-demographics", authenticateToken, adminController.getGuestDem
 router.get("/nationality-counts-by-establishment", authenticateToken, requireAdmin, adminController.getNationalityCountsByEstablishment);
 router.get("/submissions", authenticateToken, requireAdmin, adminController.getSubmissions);
 
+router.get("/admin-contact", authenticateToken, adminController.getAdminContactDetails);
+
 // Pending users
 router.get(
   '/pending-users',

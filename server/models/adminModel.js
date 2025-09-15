@@ -693,6 +693,27 @@ class AdminModel {
 
     return filtered;
   }
+
+  // Add this method to get admin contact details by municipality
+static async getAdminContactDetails(municipality) {
+  const result = await pool.query(
+    `SELECT 
+      company_name, 
+      email, 
+      phone_number, 
+      region, 
+      province, 
+      municipality, 
+      barangay,
+      company_address
+     FROM users 
+     WHERE role = 'admin' 
+       AND TRIM(municipality) ILIKE TRIM($1)`,
+    [municipality]
+  );
+  
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
 }
 
 module.exports = AdminModel;

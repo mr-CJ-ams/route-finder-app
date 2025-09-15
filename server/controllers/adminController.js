@@ -309,3 +309,28 @@ exports.getAdminProfile = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+// Add this method to get admin contact details by municipality
+exports.getAdminContactDetails = async (req, res) => {
+  try {
+    const { municipality } = req.query;
+    
+    if (!municipality) {
+      return res.status(400).json({ error: "Municipality parameter is required" });
+    }
+    
+    // Get admin details for the specified municipality using the model
+    const adminContact = await AdminModel.getAdminContactDetails(municipality);
+    
+    if (!adminContact) {
+      return res.status(404).json({ 
+        error: "Admin contact details not found for this municipality" 
+      });
+    }
+    
+    res.json(adminContact);
+  } catch (err) {
+    console.error("Error fetching admin contact details:", err);
+    res.status(500).json({ error: "Failed to fetch admin contact details" });
+  }
+};

@@ -29,68 +29,10 @@ const HelpSupportPage = () => {
               <span className="text-white font-semibold">TDMS</span>
             </div>
           </div>
-          <h3 className="text-2xl sm:text-4xl font-bold text-white mb-2 sm:mb-4">Help and Support</h3>
-          <p className="text-base sm:text-lg text-blue-100">
+          <h3 className="text-2xl sm:text-4xl font-bold text-white mb-2 sm:mb-4">Video Demonstration</h3>
+          {/* <p className="text-base sm:text-lg text-blue-100">
             We're here to help you! Reach out to us for any inquiries or assistance.
-          </p>
-        </div>
-
-        {/* Contact Details Section */}
-        <div className="p-4 sm:p-8">
-          <h4 className="text-xl sm:text-2xl font-semibold text-sky-900 mb-4 sm:mb-6">
-            Contact the Tourism Office
-          </h4>
-
-          {/* Contact Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {/* Phone */}
-            <div className="flex flex-col bg-sky-50 p-3 sm:p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center mb-2">
-                <div className="bg-blue-500 p-3 rounded-full text-white flex items-center justify-center mr-3">
-                  <Phone size={24} />
-                </div>
-                <h5 className="text-base sm:text-lg font-semibold text-sky-900">Phone</h5>
-              </div>
-              <p className="text-gray-600 text-sm sm:text-base">(038) 411 6731</p>
-            </div>
-
-            {/* Email */}
-            <div className="flex flex-col bg-sky-50 p-3 sm:p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center mb-2">
-                <div className="bg-blue-500 p-3 rounded-full text-white flex items-center justify-center mr-3">
-                  <Mail size={24} />
-                </div>
-                <h5 className="text-base sm:text-lg font-semibold text-sky-900">Email</h5>
-              </div>
-              <p className="text-gray-600 text-sm sm:text-base break-words whitespace-normal">tourismpanglaocentral@gmail.com</p>
-              <p className="text-gray-600 text-sm sm:text-base break-words whitespace-normal">statistics.tourismpanglao@gmail.com</p>
-            </div>
-
-            {/* Address */}
-            <div className="flex flex-col bg-sky-50 p-3 sm:p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center mb-2">
-                <div className="bg-blue-500 p-3 rounded-full text-white flex items-center justify-center mr-3">
-                  <MapPin size={24} />
-                </div>
-                <h5 className="text-base sm:text-lg font-semibold text-sky-900">Address</h5>
-              </div>
-              <p className="text-gray-600 text-sm sm:text-base">
-                Poblacion, Panglao, Bohol
-              </p>
-            </div>
-
-            {/* Office Hours */}
-            <div className="flex flex-col bg-sky-50 p-3 sm:p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center mb-2">
-                <div className="bg-blue-500 p-3 rounded-full text-white flex items-center justify-center mr-3">
-                  <Clock size={24} />
-                </div>
-                <h5 className="text-base sm:text-lg font-semibold text-sky-900">Office Hours</h5>
-              </div>
-              <p className="text-gray-600 text-sm sm:text-base">Monday - Friday: 8:00 AM - 5:00 PM</p>
-              <p className="text-gray-600 text-sm sm:text-base">Saturday & Sunday: Closed</p>
-            </div>
-          </div>
+          </p> */}
         </div>
 
        {/* User Guide section */} 

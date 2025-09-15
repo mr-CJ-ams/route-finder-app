@@ -65,7 +65,7 @@ const navItems = [
   { key: "submission-history", label: "Submission Records", icon: "bi-clock-history" },
   { key: "user-statistics", label: "My Statistics", icon: "bi-graph-up" },
   { key: "profile-management", label: "Profile", icon: "bi-person" },
-  { key: "admin-dashboard", label: "Panglao Statistics", icon: "bi-bar-chart" },
+  { key: "admin-dashboard", label: "Municipal Statistics", icon: "bi-bar-chart" },
   { key: "help-support", label: "Help and Support", icon: "bi-question-circle" },
 ];
 
