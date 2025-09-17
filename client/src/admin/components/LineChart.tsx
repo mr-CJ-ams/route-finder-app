@@ -21,11 +21,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
   formatMonth,
   adminMunicipality, // Destructure municipality prop
 }) => {
-  // Memoize predicted data to avoid filtering on every render
-  const predictedData = useMemo(
-    () => monthlyCheckIns.filter((d) => d.isPredicted),
-    [monthlyCheckIns]
-  );
+  // Removed prediction-related data and UI
 
   // Memoize CustomTooltip to avoid recreation
   const CustomTooltip = useCallback((
@@ -34,7 +30,6 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
     if (active && payload && payload.length) {
       const month = formatMonth(Number(label));
       const actualArrivals = payload.find((entry) => entry.name === "Actual Arrivals")?.value;
-      const predictedArrivals = payload.find((entry) => entry.name === "Prediction of Arrivals")?.value;
 
       return (
         <div style={{
@@ -46,9 +41,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
         }}>
           <p style={{ fontWeight: "bold", color: "#263238", marginBottom: "8px" }}>{month}</p>
           <p style={{ color: "#0288D1" }}>Actual Arrivals: {actualArrivals}</p>
-          {predictedArrivals !== undefined && (
-            <p style={{ color: "#FF6F00" }}>Prediction of Arrivals: {predictedArrivals}</p>
-          )}
+          {/* Prediction values removed */}
         </div>
       );
     }
@@ -63,6 +56,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
         <div style={{ minWidth: 700, width: "100%" }}>
           <ResponsiveContainer width="100%" height={400}>
             <RechartsLineChart
+              key={monthlyCheckIns.map(d => `${d.month}:${d.total_check_ins}`).join('|')}
               data={monthlyCheckIns}
               margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
@@ -90,6 +84,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
               <YAxis
                 tick={{ fill: "#37474F", fontSize: 12, fontWeight: "bold" }} // Dark gray text
                 axisLine={{ stroke: "#37474F", strokeWidth: 1 }} // Dark gray axis line
+                domain={[0, 'auto']}
               />
 
               {/* Custom Tooltip */}
@@ -115,42 +110,12 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
                 strokeWidth={2}
               />
 
-              {/* Prediction of Arrivals Line (only for 2025) */}
-              {selectedYear === 2025 && (
-                <Line
-                  type="monotone"
-                  dataKey="total_check_ins"
-                  stroke="#FF6F00" // Amber color for the prediction line
-                  name="Prediction of Arrivals"
-                  strokeOpacity={0.8}
-                  dot={false}
-                  strokeWidth={2}
-                  data={predictedData}
-                />
-              )}
+              {/* Prediction line removed */}
             </RechartsLineChart>
           </ResponsiveContainer>
         </div>
       </div>
-      <div style={{ textAlign: "center", marginTop: "20px" }}>
-        <a
-          href="https://colab.research.google.com/drive/1bu_JoysTvJXpopbX-EA9LscEXdfCl921#scrollTo=bk8J7IJiVnGG"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            backgroundColor: "#0288D1",
-            color: "#FFFFFF",
-            padding: "10px 20px",
-            borderRadius: "5px",
-            textDecoration: "none",
-            fontSize: "16px",
-            fontWeight: "bold",
-            display: "inline-block",
-          }}
-        >
-          Learn More About Prediction Factors
-        </a>
-      </div>
+      {/* Prediction factors link removed */}
     </div>
   );
 };

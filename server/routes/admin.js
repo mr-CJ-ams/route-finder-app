@@ -78,10 +78,14 @@ router.get("/nationality-counts", authenticateToken, adminController.getNational
 router.get("/guest-demographics", authenticateToken, adminController.getGuestDemographics);
 
 // Keep admin-only restrictions for these sensitive endpoints
-router.get("/nationality-counts-by-establishment", authenticateToken, requireAdmin, adminController.getNationalityCountsByEstablishment);
+router.get("/nationality-counts-by-establishment", authenticateToken, adminController.getNationalityCountsByEstablishment);
+router.get("/nationality-counts-by-municipality", authenticateToken, adminController.getNationalityCountsByMunicipality);
 router.get("/submissions", authenticateToken, requireAdmin, adminController.getSubmissions);
 
 router.get("/admin-contact", authenticateToken, adminController.getAdminContactDetails);
+
+// Municipalities list for province (p_admin + admin)
+router.get("/municipalities", authenticateToken, adminController.getAdminMunicipalities);
 
 // Pending users
 router.get(

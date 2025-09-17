@@ -4,6 +4,7 @@ import Signup from "./user/pages/Signup";
 import Login from "./user/pages/Login";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import UserDashboard from "./user/pages/UserDashboard";
+import ProvincialAdminDashboard from "./provincial_admin/ProvincialAdminDashboard";
 import ProtectedRoute from "./components/ProtectRoute";
 import ForgotPassword from "./user/pages/ForgotPassword";
 import ResetPassword from "./user/pages/ResetPassword";
@@ -32,6 +33,14 @@ const App = () => {
           element={
             <ProtectedRoute isAdmin={true}>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/provincial-admin/dashboard"
+          element={
+            <ProtectedRoute isProvincialAdmin={true}>
+              <ProvincialAdminDashboard />
             </ProtectedRoute>
           }
         />

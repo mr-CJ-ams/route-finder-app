@@ -93,6 +93,8 @@ const Login = () => {
       sessionStorage.setItem("user", JSON.stringify(data.user));
       if (data.user.role === "admin") {
         navigate("/admin/dashboard");
+      } else if (data.user.role === "p_admin") {
+        navigate("/provincial-admin/dashboard");
       } else {
         navigate("/user/dashboard");
       }

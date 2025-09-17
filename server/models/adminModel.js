@@ -415,7 +415,7 @@ class AdminModel {
       WHERE s.year = $1
         AND TRIM(u.region) ILIKE TRIM($2)
         AND TRIM(u.province) ILIKE TRIM($3)
-        AND TRIM(u.municipality) ILIKE TRIM($4)
+        AND ($4::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($4::text))
       GROUP BY s.month
       ORDER BY s.month ASC
       `,
@@ -443,7 +443,7 @@ class AdminModel {
         WHERE s.year = $1
           AND TRIM(u.region) ILIKE TRIM($2)
           AND TRIM(u.province) ILIKE TRIM($3)
-          AND TRIM(u.municipality) ILIKE TRIM($4)
+          AND ($4::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($4::text))
         GROUP BY s.month
       ),
       total_rooms AS (
@@ -455,7 +455,7 @@ class AdminModel {
         WHERE s.year = $1
           AND TRIM(u.region) ILIKE TRIM($2)
           AND TRIM(u.province) ILIKE TRIM($3)
-          AND TRIM(u.municipality) ILIKE TRIM($4)
+          AND ($4::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($4::text))
         GROUP BY s.month
       )
       SELECT 
@@ -480,7 +480,7 @@ class AdminModel {
       `SELECT COUNT(*) FROM users WHERE role = 'user'
         AND TRIM(region) ILIKE TRIM($1)
         AND TRIM(province) ILIKE TRIM($2)
-        AND TRIM(municipality) ILIKE TRIM($3)`,
+        AND ($3::text IS NULL OR TRIM(municipality) ILIKE TRIM($3::text))`,
       [region, province, municipality]
     );
 
@@ -505,7 +505,7 @@ class AdminModel {
       WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
         AND TRIM(u.region) ILIKE TRIM($3)
         AND TRIM(u.province) ILIKE TRIM($4)
-        AND TRIM(u.municipality) ILIKE TRIM($5)
+        AND ($5::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($5::text))
       GROUP BY g.nationality
       ORDER BY count DESC
       `,
@@ -515,27 +515,46 @@ class AdminModel {
   }
 
   static async getNationalityCountsByEstablishment(year, month, region, province, municipality) {
-    const result = await pool.query(
-      `
-      SELECT 
-        u.company_name AS establishment,
-        g.nationality, 
-        COUNT(*) AS count
-      FROM guests g
-      JOIN daily_metrics dm ON g.metric_id = dm.metric_id
-      JOIN submissions s ON dm.submission_id = s.submission_id
-      JOIN users u ON s.user_id = u.user_id
-      WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
-        AND TRIM(u.region) ILIKE TRIM($3)
-        AND TRIM(u.province) ILIKE TRIM($4)
-        AND TRIM(u.municipality) ILIKE TRIM($5)
-      GROUP BY u.company_name, g.nationality
-      ORDER BY u.company_name ASC, g.nationality ASC
-      `,
-      [year, month, region, province, municipality]
-    );
-    return result.rows;
-  }
+  const query = `
+    SELECT 
+      u.company_name AS establishment,
+      u.municipality,
+      g.nationality, 
+      COUNT(*) AS count
+    FROM guests g
+    JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+    JOIN submissions s ON dm.submission_id = s.submission_id
+    JOIN users u ON s.user_id = u.user_id
+    WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
+      AND TRIM(u.region) ILIKE TRIM($3)
+      AND TRIM(u.province) ILIKE TRIM($4)
+      AND ($5::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($5::text))
+    GROUP BY u.company_name, u.municipality, g.nationality
+    ORDER BY u.municipality ASC, u.company_name ASC, g.nationality ASC
+  `;
+  const result = await pool.query(query, [year, month, region, province, municipality]);
+  return result.rows;
+}
+
+  static async getNationalityCountsByMunicipality(year, month, region, province) {
+  const query = `
+    SELECT 
+      TRIM(u.municipality) AS municipality,
+      g.nationality,
+      COUNT(*) AS count
+    FROM guests g
+    JOIN daily_metrics dm ON g.metric_id = dm.metric_id
+    JOIN submissions s ON dm.submission_id = s.submission_id
+    JOIN users u ON s.user_id = u.user_id
+    WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
+      AND TRIM(u.region) ILIKE TRIM($3)
+      AND TRIM(u.province) ILIKE TRIM($4)
+    GROUP BY TRIM(u.municipality), g.nationality
+    ORDER BY TRIM(u.municipality) ASC, g.nationality ASC
+  `;
+  const result = await pool.query(query, [year, month, region, province]);
+  return result.rows;
+}
 
   static async getGuestDemographics(year, month, region, province, municipality) {
     const result = await pool.query(
@@ -555,13 +574,30 @@ class AdminModel {
       WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
         AND TRIM(u.region) ILIKE TRIM($3)
         AND TRIM(u.province) ILIKE TRIM($4)
-        AND TRIM(u.municipality) ILIKE TRIM($5)
+        AND ($5::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($5::text))
       GROUP BY g.gender, age_group, g.status
       ORDER BY g.gender, age_group, g.status
       `,
       [year, month, region, province, municipality]
     );
     return result.rows;
+  }
+
+  // List municipalities (admins) within a province for filters
+  static async getAdminMunicipalities(region, province) {
+    const result = await pool.query(
+      `
+      SELECT DISTINCT TRIM(municipality) AS municipality
+      FROM users
+      WHERE role = 'admin'
+        AND TRIM(region) ILIKE TRIM($1)
+        AND TRIM(province) ILIKE TRIM($2)
+        AND TRIM(municipality) IS NOT NULL AND TRIM(municipality) <> ''
+      ORDER BY municipality ASC
+      `,
+      [region, province]
+    );
+    return result.rows.map(r => r.municipality);
   }
 
   // Get storage usage for tables, filtered by admin's address

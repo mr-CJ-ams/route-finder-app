@@ -59,16 +59,26 @@ const { sendEmailNotification } = require("../utils/email");
 const db = require("../db"); // Make sure db is imported!
 
 async function getFilterAddress(req) {
+  // System admin: use stored admin address
   if (req.user.role === 'admin') {
     return await AdminModel.getAdminAddress(req.user.user_id);
-  } else {
-    // For users, use their own address from JWT
+  }
+
+  // Provincial admin: province-wide scope (no municipality filter)
+  if (req.user.role === 'p_admin') {
     return {
       region: req.user.region,
       province: req.user.province,
-      municipality: req.user.municipality
+      municipality: null
     };
   }
+
+  // Default (regular user): use own full address from JWT
+  return {
+    region: req.user.region,
+    province: req.user.province,
+    municipality: req.user.municipality
+  };
 }
 
 // Get all users with role 'user' and matching address to admin
@@ -196,8 +206,32 @@ exports.getSubmissions = async (req, res) => {
 // Monthly Check-ins
 exports.getMonthlyCheckins = async (req, res) => {
   try {
-    const { year } = req.query;
-    const { region, province, municipality } = await getFilterAddress(req);
+    const { year, municipality: qMunicipality } = req.query;
+    const { region, province, municipality: storedMunicipality } = await getFilterAddress(req);
+
+    // Determine municipality scope
+    let municipality = null;
+    if (req.user.role === 'admin') {
+      // Municipal admin defaults to their own municipality unless a specific one is requested
+      municipality = qMunicipality && qMunicipality.toUpperCase() !== 'ALL'
+        ? qMunicipality
+        : (storedMunicipality || null);
+    } else if (req.user.role === 'p_admin') {
+      // Provincial admin: allow optional municipality filter within their province
+      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
+        const allowed = await AdminModel.getAdminMunicipalities(region, province);
+        if (!allowed.includes(qMunicipality)) {
+          return res.status(403).json({ error: 'Municipality not permitted' });
+        }
+        municipality = qMunicipality;
+      } else {
+        municipality = null; // Province-wide
+      }
+    } else {
+      // Regular users: stick to their own municipality
+      municipality = storedMunicipality || req.user.municipality || null;
+    }
+
     const result = await AdminModel.getMonthlyCheckins(year, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -209,8 +243,28 @@ exports.getMonthlyCheckins = async (req, res) => {
 // Monthly Metrics
 exports.getMonthlyMetrics = async (req, res) => {
   try {
-    const { year } = req.query;
-    const { region, province, municipality } = await getFilterAddress(req);
+    const { year, municipality: qMunicipality } = req.query;
+    const { region, province, municipality: storedMunicipality } = await getFilterAddress(req);
+
+    let municipality = null;
+    if (req.user.role === 'admin') {
+      municipality = qMunicipality && qMunicipality.toUpperCase() !== 'ALL'
+        ? qMunicipality
+        : (storedMunicipality || null);
+    } else if (req.user.role === 'p_admin') {
+      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
+        const allowed = await AdminModel.getAdminMunicipalities(region, province);
+        if (!allowed.includes(qMunicipality)) {
+          return res.status(403).json({ error: 'Municipality not permitted' });
+        }
+        municipality = qMunicipality;
+      } else {
+        municipality = null;
+      }
+    } else {
+      municipality = storedMunicipality || req.user.municipality || null;
+    }
+
     const { metrics, totalUsers } = await AdminModel.getMonthlyMetrics(
       year,
       region,
@@ -233,8 +287,28 @@ exports.getMonthlyMetrics = async (req, res) => {
 // Nationality Counts
 exports.getNationalityCounts = async (req, res) => {
   try {
-    const { year, month } = req.query;
-    const { region, province, municipality } = await getFilterAddress(req);
+    const { year, month, municipality: qMunicipality } = req.query;
+    const { region, province, municipality: storedMunicipality } = await getFilterAddress(req);
+
+    let municipality = null;
+    if (req.user.role === 'admin') {
+      municipality = qMunicipality && qMunicipality.toUpperCase() !== 'ALL'
+        ? qMunicipality
+        : (storedMunicipality || null);
+    } else if (req.user.role === 'p_admin') {
+      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
+        const allowed = await AdminModel.getAdminMunicipalities(region, province);
+        if (!allowed.includes(qMunicipality)) {
+          return res.status(403).json({ error: 'Municipality not permitted' });
+        }
+        municipality = qMunicipality;
+      } else {
+        municipality = null;
+      }
+    } else {
+      municipality = storedMunicipality || req.user.municipality || null;
+    }
+
     const result = await AdminModel.getNationalityCounts(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -246,9 +320,32 @@ exports.getNationalityCounts = async (req, res) => {
 // Nationality Counts by Establishment
 exports.getNationalityCountsByEstablishment = async (req, res) => {
   try {
-    const { year, month } = req.query;
-    const { region, province, municipality } = await getFilterAddress(req);
-    const result = await AdminModel.getNationalityCountsByEstablishment(year, month, region, province, municipality);
+    const { year, month, municipality: qMunicipality } = req.query;
+    const { region, province, municipality: storedMunicipality } = await getFilterAddress(req);
+    
+    let municipality = null;
+    
+    // For provincial admins or system admins
+    if (req.user.role === 'p_admin' || req.user.role === 'admin') {
+      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
+        // For specific municipality, validate it exists in the province
+        const allowed = await AdminModel.getAdminMunicipalities(region, province);
+        if (!allowed.includes(qMunicipality)) {
+          return res.status(403).json({ error: 'Municipality not permitted' });
+        }
+        municipality = qMunicipality;
+      } else {
+        // If ALL or no municipality specified, don't filter by municipality
+        municipality = null;
+      }
+    } else {
+      // Regular users: use their own municipality
+      municipality = storedMunicipality || req.user.municipality || null;
+    }
+
+    const result = await AdminModel.getNationalityCountsByEstablishment(
+      year, month, region, province, municipality
+    );
     res.json(result);
   } catch (err) {
     console.error("Error fetching nationality counts by establishment:", err);
@@ -256,11 +353,61 @@ exports.getNationalityCountsByEstablishment = async (req, res) => {
   }
 };
 
+// Nationality Counts by Municipality (province-wide summary)
+exports.getNationalityCountsByMunicipality = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    if (!(req.user.role === 'p_admin' || req.user.role === 'admin')) {
+      return res.status(403).json({ error: 'Insufficient privileges' });
+    }
+    const { region, province } = await getFilterAddress(req);
+    const result = await AdminModel.getNationalityCountsByMunicipality(year, month, region, province);
+    res.json(result);
+  } catch (err) {
+    console.error("Error fetching nationality counts by municipality:", err);
+    res.status(500).json({ error: "Failed to fetch nationality counts by municipality" });
+  }
+};
+
+// Nationality Counts by Municipality (province-wide summary)
+exports.getNationalityCountsByMunicipality = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    if (!(req.user.role === 'p_admin' || req.user.role === 'admin')) {
+      return res.status(403).json({ error: 'Insufficient privileges' });
+    }
+    const { region, province } = await getFilterAddress(req);
+    const result = await AdminModel.getNationalityCountsByMunicipality(year, month, region, province);
+    res.json(result);
+  } catch (err) {
+    console.error("Error fetching nationality counts by municipality:", err);
+    res.status(500).json({ error: "Failed to fetch nationality counts by municipality" });
+  }
+};
+
 // Guest Demographics
 exports.getGuestDemographics = async (req, res) => {
   try {
-    const { year, month } = req.query;
-    const { region, province, municipality } = await getFilterAddress(req);
+    const { year, month, municipality: qMunicipality } = req.query;
+    const { region, province } = await getFilterAddress(req);
+
+    let municipality = null;
+    if (req.user.role === 'admin') {
+      municipality = qMunicipality && qMunicipality.toUpperCase() !== 'ALL' ? qMunicipality : null;
+    } else if (req.user.role === 'p_admin') {
+      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
+        const allowed = await AdminModel.getAdminMunicipalities(region, province);
+        if (!allowed.includes(qMunicipality)) {
+          return res.status(403).json({ error: 'Municipality not permitted' });
+        }
+        municipality = qMunicipality;
+      } else {
+        municipality = null;
+      }
+    } else {
+      municipality = req.user.municipality || null;
+    }
+
     const result = await AdminModel.getGuestDemographics(year, month, region, province, municipality);
     res.json(result);
   } catch (err) {
@@ -307,6 +454,21 @@ exports.getAdminProfile = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Municipalities list for province (for p_admin filter)
+exports.getAdminMunicipalities = async (req, res) => {
+  try {
+    const { role, region, province } = req.user;
+    if (role !== 'p_admin' && role !== 'admin') {
+      return res.status(403).json({ error: "Insufficient privileges" });
+    }
+    const municipalities = await AdminModel.getAdminMunicipalities(region, province);
+    res.json({ municipalities });
+  } catch (err) {
+    console.error("Error fetching municipalities:", err);
+    res.status(500).json({ error: "Failed to fetch municipalities" });
   }
 };
 

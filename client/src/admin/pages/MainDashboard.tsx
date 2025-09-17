@@ -108,20 +108,7 @@ interface DemographicData {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-const predictedData2025: CheckInData[] = [
-  { month: 1, total_check_ins: 72807, isPredicted: true },
-  { month: 2, total_check_ins: 71334, isPredicted: true },
-  { month: 3, total_check_ins: 69434, isPredicted: true },
-  { month: 4, total_check_ins: 72970, isPredicted: true },
-  { month: 5, total_check_ins: 73620, isPredicted: true },
-  { month: 6, total_check_ins: 70163, isPredicted: true },
-  { month: 7, total_check_ins: 0, isPredicted: true },
-  { month: 8, total_check_ins: 0, isPredicted: true },
-  { month: 9, total_check_ins: 0, isPredicted: true },
-  { month: 10, total_check_ins: 0, isPredicted: true },
-  { month: 11, total_check_ins: 0, isPredicted: true },
-  { month: 12, total_check_ins: 0, isPredicted: true },
-];
+// Removed predictedData2025 to avoid duplicate month labels
 
 const MainDashboard = ({ 
   user, 
@@ -186,9 +173,7 @@ const MainDashboard = ({
         };
 
         const checkInsData = fillMonths<CheckInData>(checkInsRes.data);
-        setMonthlyCheckIns(
-          selectedYear === 2025 ? [...checkInsData, ...predictedData2025] : checkInsData
-        );
+        setMonthlyCheckIns(checkInsData);
         
         setMonthlyMetrics(
           fillMonths<MonthlyMetric>(metricsRes.data, [

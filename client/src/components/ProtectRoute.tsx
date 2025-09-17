@@ -2,21 +2,26 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { ProtectedRouteProps } from "../types";
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, isAdmin = false }) => {
-  const token = sessionStorage.getItem("token");
-  const user = JSON.parse(sessionStorage.getItem("user") || "null"); // Get user details
+interface ExtendedProtectedRouteProps extends ProtectedRouteProps {
+  isProvincialAdmin?: boolean;
+}
 
-  // If no token, redirect to login
+const ProtectedRoute: React.FC<ExtendedProtectedRouteProps> = ({ children, isAdmin = false, isProvincialAdmin = false }) => {
+  const token = sessionStorage.getItem("token");
+  const user = JSON.parse(sessionStorage.getItem("user") || "null");
+
   if (!token) {
     return <Navigate to="/login" />;
   }
 
-  // If the route is for admins, check the user's role
   if (isAdmin && user?.role !== "admin") {
-    return <Navigate to="/login" />; // Redirect to login if not an admin
+    return <Navigate to="/login" />;
   }
 
-  // If authenticated (and authorized for admin routes), render the children
+  if (isProvincialAdmin && user?.role !== "p_admin") {
+    return <Navigate to="/login" />;
+  }
+
   return <>{children}</>;
 };
 

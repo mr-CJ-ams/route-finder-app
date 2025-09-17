@@ -70,25 +70,48 @@ const RegionalDistribution = ({
   selectedMonth,
   formatMonth,
   user,
-  adminMunicipality // <-- Add this prop
+  adminMunicipality // <-- This should be the municipality filter value
 }) => {
   const [establishmentData, setEstablishmentData] = React.useState([]);
 
   React.useEffect(() => {
-    async function fetchEstablishmentData() {
-      try {
-        const token = sessionStorage.getItem("token");
-        const res = await axios.get(`${API_BASE_URL}/admin/nationality-counts-by-establishment`, {
+  async function fetchData() {
+    try {
+      const token = sessionStorage.getItem("token");
+      
+      // Determine if we're showing ALL municipalities or a specific one
+      const isAllMunicipality = !adminMunicipality || adminMunicipality.toUpperCase() === "ALL";
+      
+      if (isAllMunicipality) {
+        // Fetch municipality-level data for province (ALL)
+        const res = await axios.get(`${API_BASE_URL}/admin/nationality-counts-by-municipality`, {
           params: { year: selectedYear, month: selectedMonth },
           headers: { Authorization: `Bearer ${token}` },
         });
         setEstablishmentData(res.data);
-      } catch (err) {
-        setEstablishmentData([]);
+      } else {
+        // Fetch establishment-level data for selected municipality
+        const res = await axios.get(`${API_BASE_URL}/admin/nationality-counts-by-establishment`, {
+          params: { 
+            year: selectedYear, 
+            month: selectedMonth,
+            municipality: adminMunicipality // Pass the specific municipality
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setEstablishmentData(res.data);
       }
+    } catch (err) {
+      console.error("Error fetching data for Excel export:", err);
+      setEstablishmentData([]);
     }
-    fetchEstablishmentData();
-  }, [selectedYear, selectedMonth]);
+  }
+  
+  // Only fetch if we have a selected year and month
+  if (selectedYear && selectedMonth) {
+    fetchData();
+  }
+}, [selectedYear, selectedMonth, adminMunicipality]);
 
   const processedData = processNationalityCounts(nationalityCounts);
 
@@ -163,100 +186,203 @@ const RegionalDistribution = ({
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Regional Distribution");
 
-    // --- Per-Establishment Nationality Counts Sheets ---
+    // --- Per-Establishment or Per-Municipality Nationality Counts Sheets ---
     if (establishmentData.length > 0) {
-      const allEstablishments = Array.from(new Set(establishmentData.map(e => e.establishment))).sort((a, b) => a.localeCompare(b));
-      const lookup = {};
-      establishmentData.forEach(({ establishment, nationality, count }) => {
-        if (!lookup[establishment]) lookup[establishment] = {};
-        lookup[establishment][nationality] = count;
-      });
-      const sumForEst = (est, nats) => nats.reduce((sum, nat) => sum + Number(lookup[est]?.[nat] || 0), 0);
-
-      // Split establishments into chunks of 10
-      for (let i = 0; i < allEstablishments.length; i += 10) {
-        const chunk = allEstablishments.slice(i, i + 10);
-        const sheetData = [];
-        sheetData.push(["REGIONAL DISTRIBUTION OF TRAVELLERS", ...Array(chunk.length).fill("")]);
-        sheetData.push(["Year =", selectedYear, ...Array(chunk.length - 1).fill("")]);
-        sheetData.push(["Month =", formatMonth(selectedMonth), ...Array(chunk.length - 1).fill("")]);
-        sheetData.push([`(${adminMunicipality} REPORT)`, ...chunk]); // <-- Dynamic
-        sheetData.push([]);
-        sheetData.push(["COUNTRY OF RESIDENCE", ...Array(chunk.length).fill("")]);
-        sheetData.push([
-          "TOTAL PHILIPPINE RESIDENTS =",
-          ...chunk.map(est => sumForEst(est, ["Philippines"]))
-        ]);
-        sheetData.push([
-          "NON-PHILIPPINE RESIDENTS =",
-          ...chunk.map(est => {
-            const allNats = Object.keys(lookup[est] || {});
-            return allNats.reduce((sum, nat) =>
-              nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[est][nat] || 0) : sum, 0);
-          })
-        ]);
-        sheetData.push([]);
-        const addRegion = (regionList, label) => {
-          sheetData.push([label, ...Array(chunk.length).fill("")]);
-          regionList.forEach(nat => {
-            const row = ["   " + nat + " ="];
-            chunk.forEach(est => {
-              row.push(Number(lookup[est]?.[nat] || 0));
-            });
-            sheetData.push(row);
-          });
+      const isAll = !adminMunicipality || adminMunicipality.toUpperCase() === "ALL";
+      if (isAll) {
+        // Show by municipality (columns = municipalities)
+        const municipalities = Array.from(new Set(establishmentData.map(e => e.municipality)))
+        .filter(m => m) // Remove null/undefined
+        .sort((a, b) => (a || '').localeCompare(b || ''));
+        const lookup = {};
+        establishmentData.forEach((row) => {
+          const bucket = row.municipality;
+          if (!bucket) return; // Skip rows without municipality
+          if (!lookup[bucket]) lookup[bucket] = {};
+          lookup[bucket][row.nationality] = row.count;
+        });
+        const sumForKey = (bucket, nats) => nats.reduce((sum, nat) => sum + Number(lookup[bucket]?.[nat] || 0), 0);
+        for (let i = 0; i < municipalities.length; i += 10) {
+          const chunk = municipalities.slice(i, i + 10);
+          const sheetData = [];
+          sheetData.push(["REGIONAL DISTRIBUTION OF TRAVELLERS", ...Array(chunk.length).fill("")]);
+          sheetData.push(["Year =", selectedYear, ...Array(chunk.length - 1).fill("")]);
+          sheetData.push(["Month =", formatMonth(selectedMonth), ...Array(chunk.length - 1).fill("")]);
+          sheetData.push([`(${adminMunicipality} REPORT)`, ...chunk]);
           sheetData.push([]);
-        };
-        addRegion(regions.ASIA.ASEAN, "ASIA - ASEAN");
-        addRegion(regions.ASIA.EAST_ASIA, "ASIA - EAST ASIA");
-        addRegion(regions.ASIA.SOUTH_ASIA, "ASIA - SOUTH ASIA");
-        addRegion(regions.MIDDLE_EAST, "MIDDLE EAST");
-        addRegion(regions.AMERICA.NORTH_AMERICA, "AMERICA - NORTH AMERICA");
-        addRegion(regions.AMERICA.SOUTH_AMERICA, "AMERICA - SOUTH AMERICA");
-        addRegion(regions.EUROPE.WESTERN_EUROPE, "EUROPE - WESTERN EUROPE");
-        addRegion(regions.EUROPE.NORTHERN_EUROPE, "EUROPE - NORTHERN EUROPE");
-        addRegion(regions.EUROPE.SOUTHERN_EUROPE, "EUROPE - SOUTHERN EUROPE");
-        addRegion(regions.EUROPE.EASTERN_EUROPE, "EUROPE - EASTERN EUROPE");
-        addRegion(regions.AUSTRALASIA_PACIFIC, "AUSTRALASIA/PACIFIC");
-        addRegion(regions.AFRICA, "AFRICA");
-        addRegion(regions.OTHERS, "OTHERS AND UNSPECIFIED RESIDENCES");
-        sheetData.push([
-          "TOTAL NON-PHILIPPINE RESIDENTS =",
-          ...chunk.map(est => {
-            const allNats = Object.keys(lookup[est] || {});
-            return allNats.reduce((sum, nat) =>
-              nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[est][nat] || 0) : sum, 0);
-          })
-        ]);
-        sheetData.push([]);
-        sheetData.push([
-          "GRAND TOTAL GUEST ARRIVALS =",
-          ...chunk.map(est => {
-            const phil = sumForEst(est, ["Philippines"]);
-            const nonPhil = Object.keys(lookup[est] || {}).reduce((sum, nat) =>
-              nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[est][nat] || 0) : sum, 0);
-            const ofw = sumForEst(est, ["Overseas Filipino"]);
-            return phil + nonPhil + ofw;
-          })
-        ]);
-        sheetData.push([
-          "   Total Philippine Residents =",
-          ...chunk.map(est => sumForEst(est, ["Philippines"]))
-        ]);
-        sheetData.push([
-          "   Total Non-Philippine Residents =",
-          ...chunk.map(est => {
-            const allNats = Object.keys(lookup[est] || {});
-            return allNats.reduce((sum, nat) =>
-              nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[est][nat] || 0) : sum, 0);
-          })
-        ]);
-        sheetData.push([
-          "   Total Overseas Filipinos =",
-          ...chunk.map(est => sumForEst(est, ["Overseas Filipino"]))
-        ]);
-        const estSheet = XLSX.utils.aoa_to_sheet(sheetData);
-        XLSX.utils.book_append_sheet(workbook, estSheet, `Establishments ${i + 1}-${i + chunk.length}`);
+          sheetData.push(["COUNTRY OF RESIDENCE", ...Array(chunk.length).fill("")]);
+          sheetData.push([
+            "TOTAL PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => sumForKey(k, ["Philippines"]))
+          ]);
+          sheetData.push([
+            "NON-PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([]);
+          const addRegion = (regionList, label) => {
+            sheetData.push([label, ...Array(chunk.length).fill("")]);
+            regionList.forEach(nat => {
+              const row = ["   " + nat + " ="];
+              chunk.forEach(k => {
+                row.push(Number(lookup[k]?.[nat] || 0));
+              });
+              sheetData.push(row);
+            });
+            sheetData.push([]);
+          };
+          addRegion(regions.ASIA.ASEAN, "ASIA - ASEAN");
+          addRegion(regions.ASIA.EAST_ASIA, "ASIA - EAST ASIA");
+          addRegion(regions.ASIA.SOUTH_ASIA, "ASIA - SOUTH ASIA");
+          addRegion(regions.MIDDLE_EAST, "MIDDLE EAST");
+          addRegion(regions.AMERICA.NORTH_AMERICA, "AMERICA - NORTH AMERICA");
+          addRegion(regions.AMERICA.SOUTH_AMERICA, "AMERICA - SOUTH AMERICA");
+          addRegion(regions.EUROPE.WESTERN_EUROPE, "EUROPE - WESTERN EUROPE");
+          addRegion(regions.EUROPE.NORTHERN_EUROPE, "EUROPE - NORTHERN EUROPE");
+          addRegion(regions.EUROPE.SOUTHERN_EUROPE, "EUROPE - SOUTHERN EUROPE");
+          addRegion(regions.EUROPE.EASTERN_EUROPE, "EUROPE - EASTERN EUROPE");
+          addRegion(regions.AUSTRALASIA_PACIFIC, "AUSTRALASIA/PACIFIC");
+          addRegion(regions.AFRICA, "AFRICA");
+          addRegion(regions.OTHERS, "OTHERS AND UNSPECIFIED RESIDENCES");
+          sheetData.push([
+            "TOTAL NON-PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([]);
+          sheetData.push([
+            "GRAND TOTAL GUEST ARRIVALS =",
+            ...chunk.map(k => {
+              const phil = sumForKey(k, ["Philippines"]);
+              const nonPhil = Object.keys(lookup[k] || {}).reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+              const ofw = sumForKey(k, ["Overseas Filipino"]);
+              return phil + nonPhil + ofw;
+            })
+          ]);
+          sheetData.push([
+            "   Total Philippine Residents =",
+            ...chunk.map(k => sumForKey(k, ["Philippines"]))
+          ]);
+          sheetData.push([
+            "   Total Non-Philippine Residents =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([
+            "   Total Overseas Filipinos =",
+            ...chunk.map(k => sumForKey(k, ["Overseas Filipino"]))
+          ]);
+          const muniSheet = XLSX.utils.aoa_to_sheet(sheetData);
+          XLSX.utils.book_append_sheet(workbook, muniSheet, `Municipalities ${i + 1}-${i + chunk.length}`);
+        }
+      } else {
+        // Show by establishment (columns = establishments in selected municipality)
+        const establishments = Array.from(new Set(establishmentData.map(e => e.establishment)))
+        .filter(e => e) // Remove null/undefined
+        .sort((a, b) => (a || '').localeCompare(b || ''));
+        const lookup = {};
+        establishmentData.forEach((row) => {
+          const bucket = row.establishment;
+          if (!bucket) return; // Skip rows without establishment
+          if (!lookup[bucket]) lookup[bucket] = {};
+          lookup[bucket][row.nationality] = row.count;
+        });
+        const sumForKey = (bucket, nats) => nats.reduce((sum, nat) => sum + Number(lookup[bucket]?.[nat] || 0), 0);
+        for (let i = 0; i < establishments.length; i += 10) {
+          const chunk = establishments.slice(i, i + 10);
+          const sheetData = [];
+          sheetData.push(["REGIONAL DISTRIBUTION OF TRAVELLERS", ...Array(chunk.length).fill("")]);
+          sheetData.push(["Year =", selectedYear, ...Array(chunk.length - 1).fill("")]);
+          sheetData.push(["Month =", formatMonth(selectedMonth), ...Array(chunk.length - 1).fill("")]);
+          sheetData.push([`(${adminMunicipality} REPORT)`, ...chunk]);
+          sheetData.push([]);
+          sheetData.push(["COUNTRY OF RESIDENCE", ...Array(chunk.length).fill("")]);
+          sheetData.push([
+            "TOTAL PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => sumForKey(k, ["Philippines"]))
+          ]);
+          sheetData.push([
+            "NON-PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([]);
+          const addRegion = (regionList, label) => {
+            sheetData.push([label, ...Array(chunk.length).fill("")]);
+            regionList.forEach(nat => {
+              const row = ["   " + nat + " ="];
+              chunk.forEach(k => {
+                row.push(Number(lookup[k]?.[nat] || 0));
+              });
+              sheetData.push(row);
+            });
+            sheetData.push([]);
+          };
+          addRegion(regions.ASIA.ASEAN, "ASIA - ASEAN");
+          addRegion(regions.ASIA.EAST_ASIA, "ASIA - EAST ASIA");
+          addRegion(regions.ASIA.SOUTH_ASIA, "ASIA - SOUTH ASIA");
+          addRegion(regions.MIDDLE_EAST, "MIDDLE EAST");
+          addRegion(regions.AMERICA.NORTH_AMERICA, "AMERICA - NORTH AMERICA");
+          addRegion(regions.AMERICA.SOUTH_AMERICA, "AMERICA - SOUTH AMERICA");
+          addRegion(regions.EUROPE.WESTERN_EUROPE, "EUROPE - WESTERN EUROPE");
+          addRegion(regions.EUROPE.NORTHERN_EUROPE, "EUROPE - NORTHERN EUROPE");
+          addRegion(regions.EUROPE.SOUTHERN_EUROPE, "EUROPE - SOUTHERN EUROPE");
+          addRegion(regions.EUROPE.EASTERN_EUROPE, "EUROPE - EASTERN EUROPE");
+          addRegion(regions.AUSTRALASIA_PACIFIC, "AUSTRALASIA/PACIFIC");
+          addRegion(regions.AFRICA, "AFRICA");
+          addRegion(regions.OTHERS, "OTHERS AND UNSPECIFIED RESIDENCES");
+          sheetData.push([
+            "TOTAL NON-PHILIPPINE RESIDENTS =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([]);
+          sheetData.push([
+            "GRAND TOTAL GUEST ARRIVALS =",
+            ...chunk.map(k => {
+              const phil = sumForKey(k, ["Philippines"]);
+              const nonPhil = Object.keys(lookup[k] || {}).reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+              const ofw = sumForKey(k, ["Overseas Filipino"]);
+              return phil + nonPhil + ofw;
+            })
+          ]);
+          sheetData.push([
+            "   Total Philippine Residents =",
+            ...chunk.map(k => sumForKey(k, ["Philippines"]))
+          ]);
+          sheetData.push([
+            "   Total Non-Philippine Residents =",
+            ...chunk.map(k => {
+              const allNats = Object.keys(lookup[k] || {});
+              return allNats.reduce((sum, nat) =>
+                nat !== "Philippines" && nat !== "Overseas Filipino" ? sum + Number(lookup[k][nat] || 0) : sum, 0);
+            })
+          ]);
+          sheetData.push([
+            "   Total Overseas Filipinos =",
+            ...chunk.map(k => sumForKey(k, ["Overseas Filipino"]))
+          ]);
+          const estSheet = XLSX.utils.aoa_to_sheet(sheetData);
+          XLSX.utils.book_append_sheet(workbook, estSheet, `Establishments ${i + 1}-${i + chunk.length}`);
+        }
       }
     }
 
@@ -288,6 +414,7 @@ const RegionalDistribution = ({
       <h3 style={{ color: "#37474F", marginBottom: "20px" }}> Top Markets Ranking </h3>
       {user?.role === "admin" && (
         <button
+          id="dae-form-2-export-btn"
           style={{
             backgroundColor: "#00BCD4",
             color: "#FFFFFF",
