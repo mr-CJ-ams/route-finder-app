@@ -25,13 +25,12 @@ const ProvincialAdminSidebar: React.FC<ProvincialAdminSidebarProps> = ({
 
   const navItems = [
     { id: "dashboard", label: "Main Dashboard", icon: "bi-house", ariaLabel: "Main Dashboard" },
-    // Add more items as needed for provincial admin
+    { id: "municipality-list", label: "Municipality List", icon: "bi-building", ariaLabel: "Municipality List" }
   ];
 
   const renderNavLink = (item: any, isMobile: boolean = false) => (
     <li className="nav-item" key={item.id}>
-      <Link
-        to="#"
+      <button
         className={`nav-link d-flex align-items-center ${activeSection === item.id ? "active" : ""}`}
         style={{
           padding: "12px 20px",
@@ -41,13 +40,18 @@ const ProvincialAdminSidebar: React.FC<ProvincialAdminSidebarProps> = ({
           borderRadius: 8,
           margin: "4px 0",
           display: "block",
+          border: "none",
+          width: "100%",
+          textAlign: "left",
+          fontWeight: activeSection === item.id ? 700 : 500,
+          cursor: "pointer"
         }}
         onClick={() => isMobile ? handleNav(item.id) : setActiveSection(item.id)}
         aria-label={item.ariaLabel}
       >
         <i className={`bi ${item.icon}`} style={{ marginRight: 12 }} />
         {item.label}
-      </Link>
+      </button>
     </li>
   );
 

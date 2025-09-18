@@ -65,6 +65,12 @@ require('dotenv').config();
 
 const app = express();
 
+// Routes
+const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/admin");
+const submissionsRoutes = require("./routes/submissions");
+const provincialAdminRoutes = require("./routes/provincialAdmin");
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -75,14 +81,13 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, "../client/build")));
 
-// Routes
-const authRoutes = require("./routes/auth");
-const adminRoutes = require("./routes/admin");
-const submissionsRoutes = require("./routes/submissions");
 
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/submissions", submissionsRoutes);
+
+// Add this with other route registrations
+app.use("/provincial-admin", provincialAdminRoutes);
 
 // Handle React routing, return all requests to React app
 app.get("*", (req, res) => {

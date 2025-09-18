@@ -6,6 +6,7 @@ import MonthlyMetrics from "../admin/components/MonthlyMetrics";
 import GuestDemographics from "../admin/components/GuestDemographics";
 import NationalityCounts from "../admin/components/NationalityCounts";
 import RegionalDistribution from "../admin/components/RegionalDistribution";
+import MunicipalityList from "./components/MunicipalityList";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -168,55 +169,58 @@ const ProvincialAdminDashboard = () => {
     isNaN(parseFloat(v as string)) ? d : parseFloat(v as string);
 
   return (
-    <div style={{ display: "flex" }}>
-      <ProvincialAdminSidebar
-        open={sidebarOpen}
-        setOpen={setSidebarOpen}
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-        handleLogout={handleLogout}
-        adminProvince={province}
-      />
-      <div style={{ marginLeft: 260, width: "100%", padding: 30, background: "#F5F7FA", minHeight: "100vh" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 style={{ color: "#0288D1", fontWeight: 700 }}>
-            {province} Provincial Dashboard
-          </h2>
-          <button
-            className="btn btn-outline-info d-md-none"
-            onClick={() => setSidebarOpen(true)}
-            style={{ fontWeight: 600 }}
-          >
-            Menu
-          </button>
-        </div>
-        
-        <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <label style={{ fontWeight: 600, marginRight: 8 }}>Year:</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              style={{ padding: "6px 10px", borderRadius: 6 }}
+  <div style={{ display: "flex" }}>
+    <ProvincialAdminSidebar
+      open={sidebarOpen}
+      setOpen={setSidebarOpen}
+      activeSection={activeSection}
+      setActiveSection={setActiveSection}
+      handleLogout={handleLogout}
+      adminProvince={province}
+    />
+    <div style={{ marginLeft: 260, width: "100%", padding: 30, background: "#F5F7FA", minHeight: "100vh" }}>
+      
+      {/* Only show dashboard header and filters for dashboard section */}
+      {activeSection === "dashboard" && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h2 style={{ color: "#0288D1", fontWeight: 700 }}>
+              {province} Provincial Dashboard
+            </h2>
+            <button
+              className="btn btn-outline-info d-md-none"
+              onClick={() => setSidebarOpen(true)}
+              style={{ fontWeight: 600 }}
             >
-              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+              Menu
+            </button>
           </div>
-          <div>
-            <label style={{ fontWeight: 600, marginRight: 8 }}>Municipality:</label>
-            <select
-              value={selectedMunicipality}
-              onChange={(e) => setSelectedMunicipality(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: 6 }}
-            >
-              {municipalities.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+          
+          <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <label style={{ fontWeight: 600, marginRight: 8 }}>Year:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                style={{ padding: "6px 10px", borderRadius: 6 }}
+              >
+                {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: 600, marginRight: 8 }}>Municipality:</label>
+              <select
+                value={selectedMunicipality}
+                onChange={(e) => setSelectedMunicipality(e.target.value)}
+                style={{ padding: "6px 10px", borderRadius: 6 }}
+              >
+                {municipalities.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label style={{ fontWeight: 600, marginRight: 8 }}>Month:</label>
               <select
@@ -230,81 +234,104 @@ const ProvincialAdminDashboard = () => {
               </select>
             </div>
           </div>
-        </div>
-        <div style={{ marginTop: 30 }}>
-          <LineChartComponent
-            monthlyCheckIns={monthlyCheckIns}
-            selectedYear={selectedYear}
-            formatMonth={formatMonth}
-            adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
-          />
-        </div>
-        <div style={{ marginTop: 20 }}>
-          <MonthlyMetrics
-            monthlyMetrics={monthlyMetrics}
-            selectedYear={selectedYear}
-            formatMonth={formatMonth}
-            toNumber={toNumber}
-            adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
-          />
-        </div>
-        <div style={{ marginTop: 20 }}>
-          
-          <GuestDemographics
-            guestDemographics={guestDemographics}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            formatMonth={formatMonth}
-            adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
-          />
-        </div>
-        <div style={{ marginTop: 20 }}>
-          <h3 style={{ color: "#37474F", marginBottom: 12 }}> Top Markets Ranking </h3>
+        </>
+      )}
+
+      {/* Show different header for municipality list section */}
+      {activeSection === "municipality-list" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ color: "#0288D1", fontWeight: 700 }}>
+            Municipality Administrators
+          </h2>
           <button
-            className="btn"
-            style={{
-              backgroundColor: "#00BCD4",
-              color: "#FFFFFF",
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: 8,
-              cursor: "pointer",
-              marginBottom: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            }}
-            onClick={() => {
-              // Delegate to RegionalDistribution's export by rendering hidden component and clicking its export
-              // Simpler: render RegionalDistribution's button inline for same UX/format
-              const anchor = document.getElementById("dae-form-2-export-btn");
-              if (anchor) (anchor as HTMLButtonElement).click();
-            }}
+            className="btn btn-outline-info d-md-none"
+            onClick={() => setSidebarOpen(true)}
+            style={{ fontWeight: 600 }}
           >
-            DAE-form 2
+            Menu
           </button>
-          <NationalityCounts
-            nationalityCounts={nationalityCounts}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            formatMonth={formatMonth}
-            adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
-          />
-          {/* Hidden RegionalDistribution instance to reuse export logic */}
-          <div style={{ display: "none" }}>
-            <RegionalDistribution
+        </div>
+      )}
+
+      {activeSection === "dashboard" && (
+        <>
+          {/* Dashboard content remains the same */}
+          <div style={{ marginTop: 30 }}>
+            <LineChartComponent
+              monthlyCheckIns={monthlyCheckIns}
+              selectedYear={selectedYear}
+              formatMonth={formatMonth}
+              adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
+            />
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <MonthlyMetrics
+              monthlyMetrics={monthlyMetrics}
+              selectedYear={selectedYear}
+              formatMonth={formatMonth}
+              toNumber={toNumber}
+              adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
+            />
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <GuestDemographics
+              guestDemographics={guestDemographics}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              formatMonth={formatMonth}
+              adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
+            />
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <h3 style={{ color: "#37474F", marginBottom: 12 }}> Top Markets Ranking </h3>
+            <button
+              className="btn"
+              style={{
+                backgroundColor: "#00BCD4",
+                color: "#FFFFFF",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: 8,
+                cursor: "pointer",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              }}
+              onClick={() => {
+                const anchor = document.getElementById("dae-form-2-export-btn");
+                if (anchor) (anchor as HTMLButtonElement).click();
+              }}
+            >
+              DAE-form 2
+            </button>
+            <NationalityCounts
               nationalityCounts={nationalityCounts}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               formatMonth={formatMonth}
-              user={{ role: "admin" }}
-              adminMunicipality={selectedMunicipality} // Pass the actual selected municipality
+              adminMunicipality={selectedMunicipality === "ALL" ? province : selectedMunicipality}
             />
+            <div style={{ display: "none" }}>
+              <RegionalDistribution
+                nationalityCounts={nationalityCounts}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                formatMonth={formatMonth}
+                user={{ role: "admin" }}
+                adminMunicipality={selectedMunicipality}
+              />
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
+      
+      {activeSection === "municipality-list" && (
+        <MunicipalityList />
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default ProvincialAdminDashboard;
