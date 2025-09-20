@@ -7,6 +7,7 @@ import GuestDemographics from "../admin/components/GuestDemographics";
 import NationalityCounts from "../admin/components/NationalityCounts";
 import RegionalDistribution from "../admin/components/RegionalDistribution";
 import MunicipalityList from "./components/MunicipalityList";
+import MunicipalitiesDashboard from "./components/MunicipalityDashboard";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -328,6 +329,10 @@ const ProvincialAdminDashboard = () => {
       
       {activeSection === "municipality-list" && (
         <MunicipalityList />
+      )}
+
+      {activeSection === "municipalities-dashboard" && (
+        <MunicipalitiesDashboard />
       )}
     </div>
   </div>

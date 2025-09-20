@@ -11,4 +11,7 @@ router.get("/municipal-admins", authenticateToken, provincialAdminController.get
 // Route: Add new municipal admin
 router.post("/add-municipal-admin", authenticateToken, provincialAdminController.addMunicipalAdmin);
 
+// Add this new route
+router.get("/municipality-metrics", authenticateToken, provincialAdminController.getMunicipalityMetrics);
+
 module.exports = router;

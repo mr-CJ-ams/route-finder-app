@@ -75,3 +75,27 @@ exports.addMunicipalAdmin = async (req, res) => {
     res.status(500).json({ error: "Failed to add municipal administrator" });
   }
 };
+
+// Add this new controller method
+exports.getMunicipalityMetrics = async (req, res) => {
+  try {
+    if (req.user.role !== 'p_admin') {
+      return res.status(403).json({ error: "Access denied. Provincial admin role required." });
+    }
+
+    const { region, province } = req.user;
+    const { year, month } = req.query;
+
+    const metrics = await ProvincialAdminModel.getMunicipalityMetrics(
+      region, 
+      province, 
+      parseInt(year), 
+      parseInt(month)
+    );
+
+    res.json(metrics);
+  } catch (err) {
+    console.error("Error fetching municipality metrics:", err);
+    res.status(500).json({ error: "Failed to fetch municipality metrics" });
+  }
+};

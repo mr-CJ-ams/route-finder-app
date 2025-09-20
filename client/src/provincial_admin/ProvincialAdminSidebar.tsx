@@ -1,5 +1,6 @@
+// client/src/provincial_admin/ProvincialAdminSidebar.tsx
+
 import React from "react";
-import { Link } from "react-router-dom";
 
 interface ProvincialAdminSidebarProps {
   open: boolean;
@@ -25,6 +26,7 @@ const ProvincialAdminSidebar: React.FC<ProvincialAdminSidebarProps> = ({
 
   const navItems = [
     { id: "dashboard", label: "Main Dashboard", icon: "bi-house", ariaLabel: "Main Dashboard" },
+    { id: "municipalities-dashboard", label: "Municipalities Dashboard", icon: "bi-grid-3x3", ariaLabel: "Municipalities Dashboard" },
     { id: "municipality-list", label: "Municipality List", icon: "bi-building", ariaLabel: "Municipality List" }
   ];
 
