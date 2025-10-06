@@ -64,6 +64,15 @@ async function getFilterAddress(req) {
     return await AdminModel.getAdminAddress(req.user.user_id);
   }
 
+  // Regional admin: region-wide scope, can be filtered by province
+  if (req.user.role === 'r_admin') {
+    return {
+      region: req.user.region,
+      province: req.query.province || null, // Use province from query if available
+      municipality: null
+    };
+  }
+
   // Provincial admin: province-wide scope (no municipality filter)
   if (req.user.role === 'p_admin') {
     return {
@@ -388,27 +397,32 @@ exports.getNationalityCountsByMunicipality = async (req, res) => {
 // Guest Demographics
 exports.getGuestDemographics = async (req, res) => {
   try {
-    const { year, month, municipality: qMunicipality } = req.query;
-    const { region, province } = await getFilterAddress(req);
-
+    const { year, month, province } = req.query;
+    const { region } = req.user;
+    let filterProvince = province;
+    // For regional admin, treat 'ALL' or empty province as null (region-wide)
+    if (req.user.role === 'r_admin') {
+      if (!province || province === 'ALL') {
+        filterProvince = null;
+      }
+    }
+    // For provincial admin, use their province if not specified
+    if (req.user.role === 'p_admin' && !province) {
+      filterProvince = req.user.province;
+    }
+    // For municipal admin, use their municipality
     let municipality = null;
     if (req.user.role === 'admin') {
-      municipality = qMunicipality && qMunicipality.toUpperCase() !== 'ALL' ? qMunicipality : null;
-    } else if (req.user.role === 'p_admin') {
-      if (qMunicipality && qMunicipality.toUpperCase() !== 'ALL') {
-        const allowed = await AdminModel.getAdminMunicipalities(region, province);
-        if (!allowed.includes(qMunicipality)) {
-          return res.status(403).json({ error: 'Municipality not permitted' });
-        }
-        municipality = qMunicipality;
-      } else {
-        municipality = null;
-      }
-    } else {
       municipality = req.user.municipality || null;
     }
-
-    const result = await AdminModel.getGuestDemographics(year, month, region, province, municipality);
+    // Call model with correct filters
+    const result = await AdminModel.getGuestDemographics(
+      year,
+      month,
+      region,
+      filterProvince,
+      municipality
+    );
     res.json(result);
   } catch (err) {
     console.error("Error fetching guest demographics:", err);

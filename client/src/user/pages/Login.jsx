@@ -89,14 +89,16 @@ const Login = () => {
         setError("Your account has been deactivated. Please contact the administrator.");
         return;
       }
-      sessionStorage.setItem("token", data.token);
-      sessionStorage.setItem("user", JSON.stringify(data.user));
-      if (data.user.role === "admin") {
-        navigate("/admin/dashboard");
-      } else if (data.user.role === "p_admin") {
-        navigate("/provincial-admin/dashboard");
-      } else {
-        navigate("/user/dashboard");
+          sessionStorage.setItem("token", data.token);
+          sessionStorage.setItem("user", JSON.stringify(data.user));
+          if (data.user.role === "admin") {
+            navigate("/admin/dashboard");
+          } else if (data.user.role === "p_admin") {
+            navigate("/provincial-admin/dashboard");
+          } else if (data.user.role === "r_admin") {
+            navigate("/regional-admin/dashboard");
+          } else {
+            navigate("/user/dashboard");
       }
     } catch {
       setError("Invalid credentials or account is deactivated");

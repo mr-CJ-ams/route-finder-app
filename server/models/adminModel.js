@@ -396,6 +396,7 @@ class AdminModel {
       FROM guests g
       JOIN daily_metrics dm ON g.metric_id = dm.metric_id
       JOIN submissions s ON dm.submission_id = s.submission_id
+      JOIN users u ON s.user_id = u.user_id
       WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
       GROUP BY g.gender, age_group, g.status
       ORDER BY g.gender, age_group, g.status
@@ -557,8 +558,7 @@ class AdminModel {
 }
 
   static async getGuestDemographics(year, month, region, province, municipality) {
-    const result = await pool.query(
-      `
+    let query = `
       SELECT 
         g.gender,
         CASE 
@@ -573,13 +573,18 @@ class AdminModel {
       JOIN users u ON s.user_id = u.user_id
       WHERE s.year = $1 AND s.month = $2 AND g.is_check_in = true
         AND TRIM(u.region) ILIKE TRIM($3)
-        AND TRIM(u.province) ILIKE TRIM($4)
-        AND ($5::text IS NULL OR TRIM(u.municipality) ILIKE TRIM($5::text))
-      GROUP BY g.gender, age_group, g.status
-      ORDER BY g.gender, age_group, g.status
-      `,
-      [year, month, region, province, municipality]
-    );
+    `;
+    const params = [year, month, region];
+    if (province) {
+      query += ` AND TRIM(u.province) ILIKE TRIM($${params.length + 1})`;
+      params.push(province);
+    }
+    if (municipality) {
+      query += ` AND TRIM(u.municipality) ILIKE TRIM($${params.length + 1})`;
+      params.push(municipality);
+    }
+    query += ` GROUP BY g.gender, age_group, g.status ORDER BY g.gender, age_group, g.status`;
+    const result = await pool.query(query, params);
     return result.rows;
   }
 

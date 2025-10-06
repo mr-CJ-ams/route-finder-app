@@ -5,6 +5,7 @@ import Login from "./user/pages/Login";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import UserDashboard from "./user/pages/UserDashboard";
 import ProvincialAdminDashboard from "./provincial_admin/ProvincialAdminDashboard";
+import RegionalAdminDashboard from "./regional_admin/RegionalAdminDashboard"; // ADD THIS IMPORT
 import ProtectedRoute from "./components/ProtectRoute";
 import ForgotPassword from "./user/pages/ForgotPassword";
 import ResetPassword from "./user/pages/ResetPassword";
@@ -27,6 +28,7 @@ const App = () => {
         <Route path="/help-support" element={<HelpSupportPage />} />
         <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/email-verification-request" element={<EmailVerificationRequest />} />
+        
         {/* Protected Routes */}
         <Route
           path="/admin/dashboard"
@@ -41,6 +43,15 @@ const App = () => {
           element={
             <ProtectedRoute isProvincialAdmin={true}>
               <ProvincialAdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        {/* ADD THIS NEW ROUTE FOR REGIONAL ADMIN */}
+        <Route
+          path="/regional-admin/dashboard"
+          element={
+            <ProtectedRoute isRegionalAdmin={true}>
+              <RegionalAdminDashboard />
             </ProtectedRoute>
           }
         />
