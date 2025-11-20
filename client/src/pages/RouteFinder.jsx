@@ -690,7 +690,99 @@ const RouteFinder = () => {
             {location && renderBoundaryStatus()}
           </div>
 
-          {/* Route Search Card - Full width, no side margins */}
+          {/* SWAPPED: Current Location Card now comes first */}
+          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-cyan-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-red-100 rounded-full p-2 shadow">
+                <MapPin size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-bold text-cyan-900 tracking-tight">
+                Your Current Location
+              </h3>
+            </div>
+
+            {locationError ? (
+              renderLocationError()
+            ) : !location ? (
+              <div className="flex justify-center items-center py-16">
+                <svg className="animate-spin h-8 w-8 text-red-500" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                <span className="ml-4 text-red-600 font-medium text-lg">Fetching your location...</span>
+              </div>
+            ) : (
+              <>
+                {originName && (
+                  <div
+                    className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
+                      isWithinPanglao
+                        ? "bg-green-50 border-green-200"
+                        : "bg-red-50 border-red-200"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold mb-2">
+                      {isWithinPanglao ? (
+                        <span className="text-green-800">📍 Your Location:</span>
+                      ) : (
+                        <span className="text-red-800">📍 Outside Panglao Municipality:</span>
+                      )}
+                    </p>
+
+                    <p
+                      className={`text-lg font-bold ${
+                        isWithinPanglao ? "text-green-900" : "text-red-900"
+                      }`}
+                    >
+                      {originName}
+                    </p>
+
+                    {originDetails.barangay && (
+                      <p className="text-sm mt-1">
+                        {isWithinPanglao ? (
+                          <span className="text-green-700">
+                            Barangay {originDetails.barangay}, Panglao, Bohol
+                          </span>
+                        ) : (
+                          <span className="text-red-700">
+                            {originDetails.municipality ? `${originDetails.municipality}, ` : ""}
+                            {originDetails.province || "Outside Panglao"}
+                          </span>
+                        )}
+                      </p>
+                    )}
+
+                    {/* Latitude & Longitude */}
+                    <div
+                      className={`mt-1 pt-1 border-t ${
+                        isWithinPanglao ? "border-green-200" : "border-red-200"
+                      }`}
+                    >
+                      <p className="text-xs font-mono">
+                        <span className="text-blue-700">
+                          Latitude: {location.latitude.toFixed(6)}
+                        </span>
+                        <span className="mx-2 text-gray-400">|</span>
+                        <span className="text-purple-700">
+                          Longitude: {location.longitude.toFixed(6)}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+
+
+                <div
+                  ref={mapRef}
+                  className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100"
+                  style={{ minHeight: "400px" }}
+                />
+              </>
+            )}
+          </div>
+
+          {/* SWAPPED: Route Search Card now comes second */}
           <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-cyan-100">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-orange-100 rounded-full p-3 shadow">
@@ -754,92 +846,6 @@ const RouteFinder = () => {
                 )}
 
                 {route && destinationCoords && renderFareCalculation()}
-              </>
-            )}
-          </div>
-
-          {/* Map Card - Full width, no side margins */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-cyan-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="bg-red-100 rounded-full p-2 shadow">
-                <MapPin size={24} className="text-red-600" />
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold text-cyan-900 tracking-tight">
-                Your Current Location
-              </h3>
-            </div>
-
-            {locationError ? (
-              renderLocationError()
-            ) : !location ? (
-              <div className="flex justify-center items-center py-16">
-                <svg className="animate-spin h-8 w-8 text-red-500" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                <span className="ml-4 text-red-600 font-medium text-lg">Fetching your location...</span>
-              </div>
-            ) : (
-              <>
-               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-                <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
-                  <p className="text-xs text-blue-600 font-semibold">Latitude</p>
-                  <p className="text-base font-mono text-blue-900 mt-1">{location.latitude.toFixed(6)}</p>
-                </div>
-                <div className="bg-purple-50 rounded-md p-3 border border-purple-200">
-                  <p className="text-xs text-purple-600 font-semibold">Longitude</p>
-                  <p className="text-base font-mono text-purple-900 mt-1">{location.longitude.toFixed(6)}</p>
-                </div>
-                <div className="bg-green-50 rounded-md p-3 border border-green-200">
-                  <p className="text-xs text-green-600 font-semibold">Accuracy</p>
-                  <p className="text-base font-mono text-green-900 mt-1">{location.accuracy.toFixed(0)}m</p>
-                </div>
-                <div className="bg-amber-50 rounded-md p-3 border border-amber-200">
-                  <p className="text-xs text-amber-600 font-semibold">Updated</p>
-                  <p className="text-base font-mono text-amber-900 mt-1">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                </div>
-              </div>
-
-                {originName && (
-                  <div className={`rounded-xl p-4 mb-6 border-2 ${
-                    isWithinPanglao 
-                      ? "bg-green-50 border-green-200" 
-                      : "bg-red-50 border-red-200"
-                  }`}>
-                    <p className="text-sm font-semibold mb-2">
-                      {isWithinPanglao ? (
-                        <span className="text-green-800">📍 Your Location:</span>
-                      ) : (
-                        <span className="text-red-800">📍 Outside Panglao Municipality:</span>
-                      )}
-                    </p>
-                    <p className={`text-lg font-bold ${
-                      isWithinPanglao ? "text-green-900" : "text-red-900"
-                    }`}>
-                      {originName}
-                    </p>
-                    {originDetails.barangay && (
-                      <p className="text-sm mt-1">
-                        {isWithinPanglao ? (
-                          <span className="text-green-700">
-                            Barangay {originDetails.barangay}, Panglao, Bohol
-                          </span>
-                        ) : (
-                          <span className="text-red-700">
-                            {originDetails.municipality ? `${originDetails.municipality}, ` : ''}
-                            {originDetails.province || 'Outside Panglao'}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div
-                  ref={mapRef}
-                  className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100"
-                  style={{ minHeight: "400px" }}
-                />
               </>
             )}
           </div>
