@@ -557,12 +557,116 @@ const RouteFinder = () => {
       );
     }
 
-    return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
-        {/* ... (your existing fare calculation JSX) ... */}
+  return (
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
+      <h4 className="font-bold text-green-900 text-lg mb-6">Route Information & Fare Calculation</h4>
+      
+      <div className="mb-6 pb-6 border-b border-green-300">
+        <label className="block text-sm font-semibold text-green-900 mb-3">
+          <Users className="inline w-4 h-4 mr-2" />
+          Passenger Type
+        </label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(["regular", "student", "elderly", "disable"]).map((type) => (
+            <button
+              key={type}
+              onClick={() => setPassengerType(type)}
+              className={`py-2 px-4 rounded-lg font-semibold transition-all ${
+                passengerType === type
+                  ? "bg-green-600 text-white shadow-lg"
+                  : "bg-white text-green-700 border-2 border-green-200 hover:border-green-400"
+              }`}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+              {type !== "regular" && <span className="text-xs ml-1">(-₱5)</span>}
+            </button>
+          ))}
+        </div>
       </div>
-    );
-  };
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
+          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Origin</p>
+          <p className="text-sm font-semibold text-green-900 mt-2 line-clamp-2">
+            {originName || "Loading..."}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
+          </p>
+          {originDetails.barangay && (
+            <p className="text-xs text-blue-600 mt-1">
+              📍 {originDetails.municipality || 'Panglao'}, {originDetails.province || 'Bohol'}
+            </p>
+          )}
+        </div>
+        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
+          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Destination</p>
+          <p className="text-sm font-semibold text-green-900 mt-2 line-clamp-2">
+            {destination.substring(0, 30)}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {destinationCoords[0].toFixed(4)}, {destinationCoords[1].toFixed(4)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
+          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Distance</p>
+          <p className="text-2xl font-bold text-green-900 mt-2">
+            {route.distance.toFixed(2)} <span className="text-base">km</span>
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-lg p-4 shadow-md border border-yellow-300">
+          <p className="text-xs text-yellow-900 font-semibold uppercase tracking-wider">Fare ({passengerType})</p>
+          <p className="text-3xl font-bold text-yellow-900 mt-2">
+            ₱{calculateFare(route.distance, passengerType).toFixed(0)}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg p-4 border border-green-200">
+        <h5 className="font-semibold text-green-900 mb-3 text-sm">Fare Breakdown</h5>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between text-gray-700">
+            <span>First 1 km:</span>
+            <span className="font-semibold">₱20.00</span>
+          </div>
+          {route.distance > 1 && (
+            <>
+              <div className="flex justify-between text-gray-700">
+                <span>Remaining {(route.distance - 1).toFixed(2)} km × ₱5/km:</span>
+                <span className="font-semibold">₱{((route.distance - 1) * 5).toFixed(2)}</span>
+              </div>
+              <div className="border-t border-gray-300 pt-2 flex justify-between text-gray-900 font-bold">
+                <span>Subtotal:</span>
+                <span>₱{(route.distance <= 1 ? 20 : 20 + (route.distance - 1) * 5).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+          {passengerType !== "regular" && (
+            <div className="flex justify-between text-green-700 font-semibold">
+              <span>Discount ({passengerType}):</span>
+              <span>-₱5.00</span>
+            </div>
+          )}
+          <div className="border-t-2 border-green-400 pt-2 flex justify-between text-green-900 font-bold text-base">
+            <span>Total Fare:</span>
+            <span>₱{calculateFare(route.distance, passengerType).toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
+        <h5 className="font-semibold text-blue-900 mb-2 text-sm">📍 Jurisdiction Information</h5>
+        <p className="text-xs text-blue-700">
+          ✅ <strong>Official Tariff Applies</strong> - Your trip originates within Panglao Municipality, Bohol.
+          {originDetails.barangay && ` You are in Barangay ${originDetails.barangay}.`}
+        </p>
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-cyan-400 to-teal-500 p-4">
