@@ -232,7 +232,6 @@ const RouteFinder = () => {
     return Math.max(fare, 0);
   };
 
-  // [Rest of your existing useEffect hooks for map initialization remain the same...]
   // Initialize Leaflet map
   useEffect(() => {
     if (location && !mapInitialized && mapRef.current) {
@@ -557,126 +556,129 @@ const RouteFinder = () => {
       );
     }
 
-  return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
-      <h4 className="font-bold text-green-900 text-lg mb-6">Route Information & Fare Calculation</h4>
-      
-      <div className="mb-6 pb-6 border-b border-green-300">
-        <label className="block text-sm font-semibold text-green-900 mb-3">
-          <Users className="inline w-4 h-4 mr-2" />
-          Passenger Type
-        </label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {(["regular", "student", "elderly", "disable"]).map((type) => (
-            <button
-              key={type}
-              onClick={() => setPassengerType(type)}
-              className={`py-2 px-4 rounded-lg font-semibold transition-all ${
-                passengerType === type
-                  ? "bg-green-600 text-white shadow-lg"
-                  : "bg-white text-green-700 border-2 border-green-200 hover:border-green-400"
-              }`}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-              {type !== "regular" && <span className="text-xs ml-1">(-₱5)</span>}
-            </button>
-          ))}
+    return (
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-200">
+        <h4 className="font-bold text-green-900 text-base mb-4">Route Information & Fare Calculation</h4>
+        
+        <div className="mb-4 pb-4 border-b border-green-300">
+          <label className="block text-xs font-semibold text-green-900 mb-2">
+            <Users className="inline w-4 h-4 mr-1" />
+            Passenger Type
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {(["regular", "student", "elderly", "disable"]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setPassengerType(type)}
+                className={`py-1 px-3 rounded-md font-semibold transition-all text-sm ${
+                  passengerType === type
+                    ? "bg-green-600 text-white shadow-md"
+                    : "bg-white text-green-700 border-2 border-green-200 hover:border-green-400"
+                }`}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+                {type !== "regular" && <span className="text-xs ml-1">(-₱5)</span>}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
-          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Origin</p>
-          <p className="text-sm font-semibold text-green-900 mt-2 line-clamp-2">
-            {originName || "Loading..."}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
-          </p>
-          {originDetails.barangay && (
-            <p className="text-xs text-blue-600 mt-1">
-              📍 {originDetails.municipality || 'Panglao'}, {originDetails.province || 'Bohol'}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Origin</p>
+            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
+              {originName || "Loading..."}
             </p>
-          )}
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
-          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Destination</p>
-          <p className="text-sm font-semibold text-green-900 mt-2 line-clamp-2">
-            {destination.substring(0, 30)}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {destinationCoords[0].toFixed(4)}, {destinationCoords[1].toFixed(4)}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-green-100">
-          <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Distance</p>
-          <p className="text-2xl font-bold text-green-900 mt-2">
-            {route.distance.toFixed(2)} <span className="text-base">km</span>
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-lg p-4 shadow-md border border-yellow-300">
-          <p className="text-xs text-yellow-900 font-semibold uppercase tracking-wider">Fare ({passengerType})</p>
-          <p className="text-3xl font-bold text-yellow-900 mt-2">
-            ₱{calculateFare(route.distance, passengerType).toFixed(0)}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg p-4 border border-green-200">
-        <h5 className="font-semibold text-green-900 mb-3 text-sm">Fare Breakdown</h5>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between text-gray-700">
-            <span>First 1 km:</span>
-            <span className="font-semibold">₱20.00</span>
+            <p className="text-xs text-gray-500 mt-1">
+              {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
+            </p>
+            {originDetails.barangay && (
+              <p className="text-xs text-blue-600 mt-1">
+                📍 {originDetails.municipality || 'Panglao'}, {originDetails.province || 'Bohol'}
+              </p>
+            )}
           </div>
-          {route.distance > 1 && (
-            <>
-              <div className="flex justify-between text-gray-700">
-                <span>Remaining {(route.distance - 1).toFixed(2)} km × ₱5/km:</span>
-                <span className="font-semibold">₱{((route.distance - 1) * 5).toFixed(2)}</span>
-              </div>
-              <div className="border-t border-gray-300 pt-2 flex justify-between text-gray-900 font-bold">
-                <span>Subtotal:</span>
-                <span>₱{(route.distance <= 1 ? 20 : 20 + (route.distance - 1) * 5).toFixed(2)}</span>
-              </div>
-            </>
-          )}
-          {passengerType !== "regular" && (
-            <div className="flex justify-between text-green-700 font-semibold">
-              <span>Discount ({passengerType}):</span>
-              <span>-₱5.00</span>
+          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Destination</p>
+            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
+              {destination.substring(0, 30)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {destinationCoords[0].toFixed(4)}, {destinationCoords[1].toFixed(4)}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-4">
+          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Distance</p>
+            <p className="text-xl font-bold text-green-900 mt-1">
+              {route.distance.toFixed(2)} <span className="text-sm">km</span>
+            </p>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-md p-3 shadow-sm border border-yellow-300">
+            <p className="text-xs text-yellow-900 font-semibold uppercase tracking-wider">Fare ({passengerType})</p>
+            <p className="text-2xl font-bold text-yellow-900 mt-1">
+              ₱{calculateFare(route.distance, passengerType).toFixed(0)}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-md p-3 border border-green-200">
+          <h5 className="font-semibold text-green-900 mb-2 text-sm">Fare Breakdown</h5>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-gray-700">
+              <span>First 1 km:</span>
+              <span className="font-semibold">₱20.00</span>
             </div>
-          )}
-          <div className="border-t-2 border-green-400 pt-2 flex justify-between text-green-900 font-bold text-base">
-            <span>Total Fare:</span>
-            <span>₱{calculateFare(route.distance, passengerType).toFixed(2)}</span>
+            {route.distance > 1 && (
+              <>
+                <div className="flex justify-between text-gray-700">
+                  <span>Remaining {(route.distance - 1).toFixed(2)} km × ₱5/km:</span>
+                  <span className="font-semibold">₱{((route.distance - 1) * 5).toFixed(2)}</span>
+                </div>
+                <div className="border-t border-gray-300 pt-1 flex justify-between text-gray-900 font-bold">
+                  <span>Subtotal:</span>
+                  <span>₱{(route.distance <= 1 ? 20 : 20 + (route.distance - 1) * 5).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            {passengerType !== "regular" && (
+              <div className="flex justify-between text-green-700 font-semibold">
+                <span>Discount ({passengerType}):</span>
+                <span>-₱5.00</span>
+              </div>
+            )}
+            <div className="border-t-2 border-green-400 pt-1 flex justify-between text-green-900 font-bold text-sm">
+              <span>Total Fare:</span>
+              <span>₱{calculateFare(route.distance, passengerType).toFixed(2)}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
-        <h5 className="font-semibold text-blue-900 mb-2 text-sm">📍 Jurisdiction Information</h5>
-        <p className="text-xs text-blue-700">
-          ✅ <strong>Official Tariff Applies</strong> - Your trip originates within Panglao Municipality, Bohol.
-          {originDetails.barangay && ` You are in Barangay ${originDetails.barangay}.`}
-        </p>
+        <div className="bg-blue-50 rounded-md p-3 border border-blue-200 mt-3">
+          <h5 className="font-semibold text-blue-900 mb-1 text-sm">📍 Jurisdiction Information</h5>
+          <p className="text-xs text-blue-700">
+            ✅ <strong>Official Tariff Applies</strong> - Your trip originates within Panglao Municipality, Bohol.
+            {originDetails.barangay && ` You are in Barangay ${originDetails.barangay}.`}
+          </p>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-cyan-400 to-teal-500 p-4">
-      <div className="w-full max-w-4xl mx-auto">
+    <div className="min-h-screen w-full bg-gradient-to-br from-cyan-400 to-teal-500">
+      {/* Remove horizontal padding from the main container */}
+      <div className="w-full mx-auto">
         <div className="space-y-6">
-          {/* Jurisdiction Status */}
-          {location && renderBoundaryStatus()}
+          {/* Jurisdiction Status - Keep some side padding for status only */}
+          <div className="px-4">
+            {location && renderBoundaryStatus()}
+          </div>
 
-          {/* Route Search Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-10 border border-cyan-100">
+          {/* Route Search Card - Full width, no side margins */}
+          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-cyan-100">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-orange-100 rounded-full p-3 shadow">
                 <Navigation size={24} className="text-orange-600" />
@@ -743,8 +745,8 @@ const RouteFinder = () => {
             )}
           </div>
 
-          {/* Map Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-10 border border-cyan-100">
+          {/* Map Card - Full width, no side margins */}
+          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 border border-cyan-100">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-red-100 rounded-full p-2 shadow">
                 <MapPin size={24} className="text-red-600" />
@@ -766,24 +768,24 @@ const RouteFinder = () => {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <p className="text-sm text-blue-600 font-semibold">Latitude</p>
-                    <p className="text-lg font-mono text-blue-900 mt-2">{location.latitude.toFixed(6)}</p>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                    <p className="text-sm text-purple-600 font-semibold">Longitude</p>
-                    <p className="text-lg font-mono text-purple-900 mt-2">{location.longitude.toFixed(6)}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                    <p className="text-sm text-green-600 font-semibold">Accuracy</p>
-                    <p className="text-lg font-mono text-green-900 mt-2">{location.accuracy.toFixed(0)}m</p>
-                  </div>
-                  <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
-                    <p className="text-sm text-amber-600 font-semibold">Updated</p>
-                    <p className="text-lg font-mono text-amber-900 mt-2">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                  </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
+                  <p className="text-xs text-blue-600 font-semibold">Latitude</p>
+                  <p className="text-base font-mono text-blue-900 mt-1">{location.latitude.toFixed(6)}</p>
                 </div>
+                <div className="bg-purple-50 rounded-md p-3 border border-purple-200">
+                  <p className="text-xs text-purple-600 font-semibold">Longitude</p>
+                  <p className="text-base font-mono text-purple-900 mt-1">{location.longitude.toFixed(6)}</p>
+                </div>
+                <div className="bg-green-50 rounded-md p-3 border border-green-200">
+                  <p className="text-xs text-green-600 font-semibold">Accuracy</p>
+                  <p className="text-base font-mono text-green-900 mt-1">{location.accuracy.toFixed(0)}m</p>
+                </div>
+                <div className="bg-amber-50 rounded-md p-3 border border-amber-200">
+                  <p className="text-xs text-amber-600 font-semibold">Updated</p>
+                  <p className="text-base font-mono text-amber-900 mt-1">{new Date(location.timestamp).toLocaleTimeString()}</p>
+                </div>
+              </div>
 
                 {originName && (
                   <div className={`rounded-xl p-4 mb-6 border-2 ${
