@@ -18,6 +18,11 @@ const RouteFinder = () => {
   const [isMobile, setIsMobile] = useState(false);
   const mapRef = useRef(null);
   const [mapInitialized, setMapInitialized] = useState(false);
+  
+  // New state for clicked coordinates
+  const [clickedCoords, setClickedCoords] = useState(null);
+  const [clickedAddress, setClickedAddress] = useState(null);
+  const [clickedDetails, setClickedDetails] = useState({});
 
   // Check if user is on mobile device
   useEffect(() => {
@@ -134,6 +139,54 @@ const RouteFinder = () => {
     }
   };
 
+  // Function to get detailed address for clicked coordinates
+  const getDetailedAddressForCoordinates = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
+      );
+      const data = await response.json();
+      
+      const address = data.address || {};
+      let placeName = getDetailedAddress(data);
+      
+      // Store detailed address information for clicked location
+      const clickedDetails = {
+        road: address.road,
+        neighbourhood: address.neighbourhood,
+        suburb: address.suburb,
+        barangay: address.barangay,
+        village: address.village,
+        municipality: address.municipality,
+        city: address.city,
+        province: address.state,
+        fullAddress: data.display_name
+      };
+
+      setClickedDetails(clickedDetails);
+
+      // If no specific place found, try with lower zoom level for broader area
+      if (!placeName) {
+        const broaderResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=14`
+        );
+        const broaderData = await broaderResponse.json();
+        placeName = getDetailedAddress(broaderData);
+        setClickedDetails(prev => ({
+          ...prev,
+          ...broaderData.address,
+          fullAddress: broaderData.display_name
+        }));
+      }
+      
+      // Final fallback - use coordinates with context
+      return placeName || `Location near ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      
+    } catch (err) {
+      return `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
   // Enhanced geolocation with better error handling
   const requestLocation = () => {
     if (!navigator.geolocation) {
@@ -232,7 +285,7 @@ const RouteFinder = () => {
     return Math.max(fare, 0);
   };
 
-  // Initialize Leaflet map
+  // Initialize Leaflet map with click handler
   useEffect(() => {
     if (location && !mapInitialized && mapRef.current) {
       const script = document.createElement("script");
@@ -258,6 +311,41 @@ const RouteFinder = () => {
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
               maxZoom: 19,
             }).addTo(map);
+
+            // Add click event listener to the map
+            map.on('click', async function(e) {
+              const { lat, lng } = e.latlng;
+              setClickedCoords({ lat, lng });
+              
+              // Get detailed address for clicked location
+              const placeName = await getDetailedAddressForCoordinates(lat, lng);
+              setClickedAddress(placeName);
+              
+              // Remove previous click marker if exists
+              if (mapRef.current.clickMarker) {
+                map.removeLayer(mapRef.current.clickMarker);
+              }
+              
+              // Add marker for clicked location
+              mapRef.current.clickMarker = L.marker([lat, lng], {
+                icon: L.icon({
+                  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+                  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41],
+                  popupAnchor: [1, -34],
+                  shadowSize: [41, 41],
+                }),
+              })
+                .addTo(map)
+                .bindPopup(`
+                  <strong>📍 Clicked Location</strong><br/>
+                  ${placeName}<br/>
+                  Lat: ${lat.toFixed(6)}<br/>
+                  Lng: ${lng.toFixed(6)}
+                `)
+                .openPopup();
+            });
 
             L.marker([location.latitude, location.longitude], {
               icon: L.icon({
@@ -509,9 +597,9 @@ const RouteFinder = () => {
           <div className="flex items-center gap-3">
             <CheckCircle className="w-6 h-6 text-green-600" />
             <div>
-              <h4 className="font-bold text-green-800 text-lg">✅ Within Panglao Municipality</h4>
+              <h4 className="font-bold text-green-800 text-lg">BiyaFare</h4>
               <p className="text-green-700 text-sm mt-1">
-                Official tariff fares apply. Your location is within the jurisdiction of Panglao, Bohol.
+                Official tariff fares apply for tricycles and motorcycles in Panglao, Bohol.
               </p>
             </div>
           </div>
@@ -536,6 +624,71 @@ const RouteFinder = () => {
     }
 
     return null;
+  };
+
+  // Render clicked coordinates information in the same format as Origin
+  const renderClickedCoordinates = () => {
+    if (!clickedCoords) return null;
+
+    const isClickedWithinPanglao = checkPanglaoBoundary(clickedCoords.lat, clickedCoords.lng);
+
+    return (
+      <div
+        className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
+          isClickedWithinPanglao
+            ? "bg-blue-50 border-blue-200"
+            : "bg-purple-50 border-purple-200"
+        }`}
+      >
+        <p className="text-sm font-semibold mb-2">
+          {isClickedWithinPanglao ? (
+            <span className="text-blue-800">📍 Clicked Location (Within Panglao):</span>
+          ) : (
+            <span className="text-purple-800">📍 Clicked Location (Outside Panglao):</span>
+          )}
+        </p>
+
+        <p
+          className={`text-lg font-bold ${
+            isClickedWithinPanglao ? "text-blue-900" : "text-purple-900"
+          }`}
+        >
+          {clickedAddress}
+        </p>
+
+        {clickedDetails.barangay && (
+          <p className="text-sm mt-1">
+            {isClickedWithinPanglao ? (
+              <span className="text-blue-700">
+                Barangay {clickedDetails.barangay}, Panglao, Bohol
+              </span>
+            ) : (
+              <span className="text-purple-700">
+                {clickedDetails.municipality ? `${clickedDetails.municipality}, ` : ""}
+                {clickedDetails.province || "Outside Panglao"}
+              </span>
+            )}
+          </p>
+        )}
+
+        {/* Latitude & Longitude */}
+        <div
+          className={`mt-1 pt-1 border-t ${
+            isClickedWithinPanglao ? "border-blue-200" : "border-purple-200"
+          }`}
+        >
+          <p className="text-xs font-mono">
+            <span className="text-blue-700">
+              Latitude: {clickedCoords.lat.toFixed(6)}
+            </span>
+            <br />
+            <span className="text-purple-700">
+              Longitude: {clickedCoords.lng.toFixed(6)}
+            </span>
+          </p>
+        </div>
+      </div>
+    );
   };
 
   // Render fare calculation section only when within Panglao
@@ -625,7 +778,7 @@ const RouteFinder = () => {
         </div>
 
         <div className="bg-white rounded-md p-3 border border-green-200">
-          <h5 className="font-semibold text-green-900 mb-2 text-sm">Fare Breakdown</h5>
+          <h5 className="font-semibold text-green-900 mb-2 text-sm">Fare Breakdown(Per Person)</h5>
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-gray-700">
               <span>First 1 km:</span>
@@ -659,7 +812,7 @@ const RouteFinder = () => {
         <div className="bg-blue-50 rounded-md p-3 border border-blue-200 mt-3">
           <h5 className="font-semibold text-blue-900 mb-1 text-sm">📍 Jurisdiction Information</h5>
           <p className="text-xs text-blue-700">
-            ✅ <strong>Official Tariff Applies</strong> - Your trip originates within Municipality of Panglao, Bohol.
+            ✅ <strong>Official Tariff Applies</strong> - Your trip originates within the jurisdiction of Panglao, Bohol.
             {originDetails.barangay && ` You are in Barangay ${originDetails.barangay}.`}
           </p>
           <div className="mt-2 pt-2 border-t border-blue-200">
@@ -762,7 +915,7 @@ const RouteFinder = () => {
                         <span className="text-blue-700">
                           Latitude: {location.latitude.toFixed(6)}
                         </span>
-                        <span className="mx-2 text-gray-400">|</span>
+                        <br />
                         <span className="text-purple-700">
                           Longitude: {location.longitude.toFixed(6)}
                         </span>
@@ -771,13 +924,19 @@ const RouteFinder = () => {
                   </div>
                 )}
 
-
+                {/* Clicked coordinates display - now in the same format as Origin */}
+                {renderClickedCoordinates()}
 
                 <div
                   ref={mapRef}
-                  className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100"
+                  className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100 cursor-pointer"
                   style={{ minHeight: "400px" }}
                 />
+                <div className="mt-2 text-center">
+                  <p className="text-sm text-gray-600">
+                    💡 <strong>Click anywhere on the map</strong> to see coordinates and address
+                  </p>
+                </div>
               </>
             )}
           </div>
@@ -833,7 +992,7 @@ const RouteFinder = () => {
                           Searching...
                         </span>
                       ) : (
-                        "Search Route"
+                        "Calculate Fare"
                       )}
                     </button>
                   </div>
