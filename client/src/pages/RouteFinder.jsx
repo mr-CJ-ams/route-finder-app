@@ -610,7 +610,7 @@ const RouteFinder = () => {
     }
   };
 
-  // Render address display with loading state
+  // Render address display with complete address format
   const renderAddressDisplay = (address, details, isLoading, isWithinBoundary, type = "origin") => {
     const colors = {
       origin: { bg: "green", text: "green", border: "green" },
@@ -620,6 +620,16 @@ const RouteFinder = () => {
     
     const color = colors[type];
     const withinColor = isWithinBoundary ? color : "red";
+
+    // Format complete address like: "Anos Fonacier Circumferential Road, Tawala, Panglao, Bohol, Central Visayas, 6339, Philippines"
+    const formatCompleteAddress = (details) => {
+      if (!details.fullAddress) return address;
+      
+      // Use the full address from Nominatim which typically has the complete format
+      return details.fullAddress;
+    };
+
+    const completeAddress = formatCompleteAddress(details);
 
     return (
       <div
@@ -660,7 +670,7 @@ const RouteFinder = () => {
                 isWithinBoundary ? `text-${withinColor}-900` : "text-red-900"
               }`}
             >
-              {address}
+              {completeAddress}
             </p>
 
             {details.barangay && (
@@ -682,9 +692,6 @@ const RouteFinder = () => {
       </div>
     );
   };
-
-  // Rest of the component remains the same...
-  // [Keep all the existing render functions and JSX as they were, but replace the address display parts]
 
   // Render mobile-specific location instructions
   const renderMobileLocationInstructions = () => {
@@ -904,23 +911,18 @@ const RouteFinder = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Origin</p>
-            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
-              {originAddressLoading ? "Fetching address..." : (originName || "Location")}
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">ORIGIN</p>
+            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-3">
+              {originAddressLoading ? "Fetching address..." : (originDetails.fullAddress || originName || "Location")}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
             </p>
-            {originDetails.barangay && !originAddressLoading && (
-              <p className="text-xs text-blue-600 mt-1">
-                📍 {originDetails.municipality || 'Panglao'}, {originDetails.province || 'Bohol'}
-              </p>
-            )}
           </div>
           <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Destination</p>
-            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
-              {destinationAddressLoading ? "Fetching address..." : (destinationDetails.fullAddress ? destinationDetails.fullAddress.substring(0, 30) : destination.substring(0, 30))}
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">DESTINATION</p>
+            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-3">
+              {destinationAddressLoading ? "Fetching address..." : (destinationDetails.fullAddress || destination)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {destinationCoords[0].toFixed(4)}, {destinationCoords[1].toFixed(4)}
