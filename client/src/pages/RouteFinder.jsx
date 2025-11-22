@@ -1043,7 +1043,7 @@ const RouteFinder = () => {
                 {renderAddressDisplay(originName, originDetails, originAddressLoading, isWithinPanglao, "origin")}
 
                 {/* Clicked coordinates display */}
-                {renderClickedCoordinates()}
+                {/* {renderClickedCoordinates()} */}
 
                 <div
                   ref={mapRef}
