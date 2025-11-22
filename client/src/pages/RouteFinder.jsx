@@ -25,6 +25,11 @@ const RouteFinder = () => {
   const [clickedDetails, setClickedDetails] = useState({});
   const [destinationDetails, setDestinationDetails] = useState({});
 
+  // Loading states for addresses
+  const [originAddressLoading, setOriginAddressLoading] = useState(true);
+  const [clickedAddressLoading, setClickedAddressLoading] = useState(false);
+  const [destinationAddressLoading, setDestinationAddressLoading] = useState(false);
+
   // Check if user is on mobile device
   useEffect(() => {
     const checkMobile = () => {
@@ -90,6 +95,7 @@ const RouteFinder = () => {
   // Enhanced location name fetcher with boundary check
   const fetchEnhancedLocationName = async (lat, lng) => {
     try {
+      setOriginAddressLoading(true);
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
       );
@@ -145,12 +151,15 @@ const RouteFinder = () => {
       });
       
       return `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } finally {
+      setOriginAddressLoading(false);
     }
   };
 
   // Function to get detailed address for clicked coordinates
   const getDetailedAddressForCoordinates = async (lat, lng) => {
     try {
+      setClickedAddressLoading(true);
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
       );
@@ -193,12 +202,15 @@ const RouteFinder = () => {
       
     } catch (err) {
       return `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } finally {
+      setClickedAddressLoading(false);
     }
   };
 
   // Function to get detailed address for destination
   const fetchDestinationDetails = async (lat, lng) => {
     try {
+      setDestinationAddressLoading(true);
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
       );
@@ -225,8 +237,63 @@ const RouteFinder = () => {
       const fallbackAddress = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       setDestinationDetails({ fullAddress: fallbackAddress });
       return fallbackAddress;
+    } finally {
+      setDestinationAddressLoading(false);
     }
   };
+
+  // Update marker popups when address data is available
+  const updateMarkerPopups = () => {
+    if (!mapRef.current?.leafletMap) return;
+    
+    const L = window.L;
+    const map = mapRef.current.leafletMap;
+    
+    // Update origin marker popup
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        const latLng = layer.getLatLng();
+        
+        // Check if this is the origin marker (green)
+        if (latLng.lat === location?.latitude && latLng.lng === location?.longitude) {
+          const popupContent = `
+            <strong>📍 Your Location</strong><br/>
+            ${originAddressLoading ? 'Fetching address...' : (originDetails.fullAddress || originName || 'Location')}<br/>
+            Lat: ${location.latitude.toFixed(6)}<br/>
+            Lng: ${location.longitude.toFixed(6)}
+          `;
+          layer.setPopupContent(popupContent);
+        }
+        
+        // Check if this is the clicked marker (blue)
+        if (clickedCoords && latLng.lat === clickedCoords.lat && latLng.lng === clickedCoords.lng) {
+          const popupContent = `
+            <strong>📍 Clicked Location</strong><br/>
+            ${clickedAddressLoading ? 'Fetching address...' : (clickedDetails.fullAddress || clickedAddress || 'Location')}<br/>
+            Lat: ${clickedCoords.lat.toFixed(6)}<br/>
+            Lng: ${clickedCoords.lng.toFixed(6)}
+          `;
+          layer.setPopupContent(popupContent);
+        }
+        
+        // Check if this is the destination marker (red)
+        if (destinationCoords && latLng.lat === destinationCoords[0] && latLng.lng === destinationCoords[1]) {
+          const popupContent = `
+            <strong>🎯 Destination</strong><br/>
+            ${destinationAddressLoading ? 'Fetching address...' : (destinationDetails.fullAddress || destination)}<br/>
+            Lat: ${destinationCoords[0].toFixed(6)}<br/>
+            Lng: ${destinationCoords[1].toFixed(6)}
+          `;
+          layer.setPopupContent(popupContent);
+        }
+      }
+    });
+  };
+
+  // Update popups when address data changes
+  useEffect(() => {
+    updateMarkerPopups();
+  }, [originDetails, clickedDetails, destinationDetails, originAddressLoading, clickedAddressLoading, destinationAddressLoading]);
 
   // Enhanced geolocation with better error handling
   const requestLocation = () => {
@@ -381,13 +448,14 @@ const RouteFinder = () => {
                 .addTo(map)
                 .bindPopup(`
                   <strong>📍 Clicked Location</strong><br/>
-                  ${clickedDetails.fullAddress || clickedAddress || 'Fetching address...'}<br/>
+                  Fetching address...<br/>
                   Lat: ${lat.toFixed(6)}<br/>
                   Lng: ${lng.toFixed(6)}
                 `)
                 .openPopup();
             });
 
+            // Add origin marker with initial popup
             L.marker([location.latitude, location.longitude], {
               icon: L.icon({
                 iconUrl:
@@ -402,7 +470,7 @@ const RouteFinder = () => {
             })
               .addTo(map)
               .bindPopup(
-                `<strong>📍 Your Location</strong><br/>${originDetails.fullAddress || 'Fetching address...'}<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
+                `<strong>📍 Your Location</strong><br/>Fetching address...<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
               );
 
             setMapInitialized(true);
@@ -411,7 +479,7 @@ const RouteFinder = () => {
       };
       document.body.appendChild(script);
     }
-  }, [location, mapInitialized, originName, originDetails, clickedDetails, clickedAddress]);
+  }, [location, mapInitialized]);
 
   // Draw route on map when route is updated
   useEffect(() => {
@@ -439,26 +507,29 @@ const RouteFinder = () => {
         className: "route-line",
       }).addTo(map);
 
-      // Fetch destination details and then add marker
+      // Add destination marker with initial popup
+      const destinationMarker = L.marker(destinationCoords, {
+        icon: L.icon({
+          iconUrl:
+            "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        }),
+        isDestinationMarker: true,
+      })
+        .addTo(map)
+        .bindPopup(
+          `<strong>🎯 Destination</strong><br/>Fetching address...<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
+        )
+        .openPopup();
+
+      // Fetch destination details and update popup
       fetchDestinationDetails(destinationCoords[0], destinationCoords[1]).then((destinationAddress) => {
-        L.marker(destinationCoords, {
-          icon: L.icon({
-            iconUrl:
-              "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-            shadowUrl:
-              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-          }),
-          isDestinationMarker: true,
-        })
-          .addTo(map)
-          .bindPopup(
-            `<strong>🎯 Destination</strong><br/>${destinationDetails.fullAddress || destinationAddress || destination}<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
-          )
-          .openPopup();
+        // Popup will be updated automatically via the updateMarkerPopups function
       });
 
       const bounds = L.latLngBounds(
@@ -467,7 +538,7 @@ const RouteFinder = () => {
       );
       map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [route, destinationCoords, destination, location, destinationDetails]);
+  }, [route, destinationCoords, destination, location]);
 
   // Handle destination search
   const handleSearchDestination = async (e) => {
@@ -513,6 +584,82 @@ const RouteFinder = () => {
       setSearchLoading(false);
     }
   };
+
+  // Render address display with loading state
+  const renderAddressDisplay = (address, details, isLoading, isWithinBoundary, type = "origin") => {
+    const colors = {
+      origin: { bg: "green", text: "green", border: "green" },
+      clicked: { bg: "blue", text: "blue", border: "blue" },
+      destination: { bg: "orange", text: "orange", border: "orange" }
+    };
+    
+    const color = colors[type];
+    const withinColor = isWithinBoundary ? color : "red";
+
+    return (
+      <div
+        className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
+          isWithinBoundary
+            ? `bg-${color.bg}-50 border-${color.border}-200`
+            : "bg-red-50 border-red-200"
+        }`}
+      >
+        <p className="text-sm font-semibold mb-2">
+          {isWithinBoundary ? (
+            <span className={`text-${withinColor}-800`}>
+              {type === "origin" && "📍 Your Location:"}
+              {type === "clicked" && "📍 Clicked Location:"}
+              {type === "destination" && "🎯 Destination:"}
+            </span>
+          ) : (
+            <span className="text-red-800">
+              {type === "origin" && "📍 Outside Panglao Municipality:"}
+              {type === "clicked" && "📍 Clicked Location (Outside Panglao):"}
+              {type === "destination" && "🎯 Destination (Outside Panglao):"}
+            </span>
+          )}
+        </p>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4 text-gray-600" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <span className="text-gray-600">Fetching address...</span>
+          </div>
+        ) : (
+          <>
+            <p
+              className={`text-lg font-bold ${
+                isWithinBoundary ? `text-${withinColor}-900` : "text-red-900"
+              }`}
+            >
+              {address}
+            </p>
+
+            {details.barangay && (
+              <p className="text-sm mt-1">
+                {isWithinBoundary ? (
+                  <span className={`text-${withinColor}-700`}>
+                    Barangay {details.barangay}, {details.municipality || 'Panglao'}, {details.province || 'Bohol'}
+                  </span>
+                ) : (
+                  <span className="text-red-700">
+                    {details.municipality ? `${details.municipality}, ` : ""}
+                    {details.province || "Outside Panglao"}
+                  </span>
+                )}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Rest of the component remains the same...
+  // [Keep all the existing render functions and JSX as they were, but replace the address display parts]
 
   // Render mobile-specific location instructions
   const renderMobileLocationInstructions = () => {
@@ -670,68 +817,18 @@ const RouteFinder = () => {
     return null;
   };
 
-  // Render clicked coordinates information in the same format as Origin
+  // Render clicked coordinates information
   const renderClickedCoordinates = () => {
     if (!clickedCoords) return null;
 
     const isClickedWithinPanglao = checkPanglaoBoundary(clickedCoords.lat, clickedCoords.lng);
 
-    return (
-      <div
-        className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
-          isClickedWithinPanglao
-            ? "bg-blue-50 border-blue-200"
-            : "bg-purple-50 border-purple-200"
-        }`}
-      >
-        <p className="text-sm font-semibold mb-2">
-          {isClickedWithinPanglao ? (
-            <span className="text-blue-800">📍 Clicked Location (Within Panglao):</span>
-          ) : (
-            <span className="text-purple-800">📍 Clicked Location (Outside Panglao):</span>
-          )}
-        </p>
-
-        <p
-          className={`text-lg font-bold ${
-            isClickedWithinPanglao ? "text-blue-900" : "text-purple-900"
-          }`}
-        >
-          {clickedAddress}
-        </p>
-
-        {clickedDetails.barangay && (
-          <p className="text-sm mt-1">
-            {isClickedWithinPanglao ? (
-              <span className="text-blue-700">
-                Barangay {clickedDetails.barangay}, Panglao, Bohol
-              </span>
-            ) : (
-              <span className="text-purple-700">
-                {clickedDetails.municipality ? `${clickedDetails.municipality}, ` : ""}
-                {clickedDetails.province || "Outside Panglao"}
-              </span>
-            )}
-          </p>
-        )}
-
-        {/* Latitude & Longitude */}
-        <div
-          className={`mt-1 pt-1 border-t ${
-            isClickedWithinPanglao ? "border-blue-200" : "border-purple-200"
-          }`}
-        >
-          <p className="text-xs font-mono">
-            <span className="text-blue-700">
-              Latitude: {clickedCoords.lat.toFixed(6)}
-            </span>
-            <br />
-            <span className="text-purple-700">
-              Longitude: {clickedCoords.lng.toFixed(6)}
-            </span>
-          </p>
-        </div>
-      </div>
+    return renderAddressDisplay(
+      clickedAddress,
+      clickedDetails,
+      clickedAddressLoading,
+      isClickedWithinPanglao,
+      "clicked"
     );
   };
 
@@ -784,12 +881,12 @@ const RouteFinder = () => {
           <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
             <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Origin</p>
             <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
-              {originName || "Loading..."}
+              {originAddressLoading ? "Fetching address..." : (originName || "Location")}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
             </p>
-            {originDetails.barangay && (
+            {originDetails.barangay && !originAddressLoading && (
               <p className="text-xs text-blue-600 mt-1">
                 📍 {originDetails.municipality || 'Panglao'}, {originDetails.province || 'Bohol'}
               </p>
@@ -798,7 +895,7 @@ const RouteFinder = () => {
           <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
             <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Destination</p>
             <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-2">
-              {destination.substring(0, 30)}
+              {destinationAddressLoading ? "Fetching address..." : (destinationDetails.fullAddress ? destinationDetails.fullAddress.substring(0, 30) : destination.substring(0, 30))}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {destinationCoords[0].toFixed(4)}, {destinationCoords[1].toFixed(4)}
@@ -857,7 +954,7 @@ const RouteFinder = () => {
           <h5 className="font-semibold text-blue-900 mb-1 text-sm">📍 Jurisdiction Information</h5>
           <p className="text-xs text-blue-700">
             ✅ <strong>Official Tariff Applies</strong> - Your trip originates within the jurisdiction of Panglao, Bohol.
-            {originDetails.barangay && ` You are in Barangay ${originDetails.barangay}.`}
+            {originDetails.barangay && !originAddressLoading && ` You are in Barangay ${originDetails.barangay}.`}
           </p>
           <div className="mt-2 pt-2 border-t border-blue-200">
             <p className="text-xs font-semibold text-blue-800 mb-1">Official Fare Structure:</p>
@@ -910,65 +1007,9 @@ const RouteFinder = () => {
               </div>
             ) : (
               <>
-                {originName && (
-                  <div
-                    className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
-                      isWithinPanglao
-                        ? "bg-green-50 border-green-200"
-                        : "bg-red-50 border-red-200"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold mb-2">
-                      {isWithinPanglao ? (
-                        <span className="text-green-800">📍 Your Location:</span>
-                      ) : (
-                        <span className="text-red-800">📍 Outside Panglao Municipality:</span>
-                      )}
-                    </p>
+                {renderAddressDisplay(originName, originDetails, originAddressLoading, isWithinPanglao, "origin")}
 
-                    <p
-                      className={`text-lg font-bold ${
-                        isWithinPanglao ? "text-green-900" : "text-red-900"
-                      }`}
-                    >
-                      {originName}
-                    </p>
-
-                    {originDetails.barangay && (
-                      <p className="text-sm mt-1">
-                        {isWithinPanglao ? (
-                          <span className="text-green-700">
-                            Barangay {originDetails.barangay}, Panglao, Bohol
-                          </span>
-                        ) : (
-                          <span className="text-red-700">
-                            {originDetails.municipality ? `${originDetails.municipality}, ` : ""}
-                            {originDetails.province || "Outside Panglao"}
-                          </span>
-                        )}
-                      </p>
-                    )}
-
-                    {/* Latitude & Longitude */}
-                    <div
-                      className={`mt-1 pt-1 border-t ${
-                        isWithinPanglao ? "border-green-200" : "border-red-200"
-                      }`}
-                    >
-                      <p className="text-xs font-mono">
-                        <span className="text-blue-700">
-                          Latitude: {location.latitude.toFixed(6)}
-                        </span>
-                        <br />
-                        <span className="text-purple-700">
-                          Longitude: {location.longitude.toFixed(6)}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Clicked coordinates display - now in the same format as Origin */}
+                {/* Clicked coordinates display */}
                 {renderClickedCoordinates()}
 
                 <div
