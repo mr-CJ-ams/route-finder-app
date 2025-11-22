@@ -1,5 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MapPin, Navigation, Users, AlertCircle, CheckCircle, Smartphone, Settings, Wifi } from "lucide-react";
+import { 
+  calculateFare, 
+  getFareBreakdown, 
+  getJurisdictionInfo, 
+  determineLocationType,
+  checkPanglaoBoundary,
+  checkTagbilaranBoundary 
+} from "../utils/fareCalculator";
 
 const RouteFinder = () => {
   // Map and route state
@@ -14,10 +22,13 @@ const RouteFinder = () => {
   const [searchError, setSearchError] = useState(null);
   const [passengerType, setPassengerType] = useState("regular");
   const [isWithinPanglao, setIsWithinPanglao] = useState(null);
+  const [isWithinTagbilaran, setIsWithinTagbilaran] = useState(null);
+  const [locationType, setLocationType] = useState(null); // 'panglao', 'tagbilaran', or 'outside'
   const [boundaryCheckLoading, setBoundaryCheckLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const mapRef = useRef(null);
   const [mapInitialized, setMapInitialized] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
   
   // New state for clicked coordinates
   const [clickedCoords, setClickedCoords] = useState(null);
@@ -36,6 +47,50 @@ const RouteFinder = () => {
       return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     };
     setIsMobile(checkMobile());
+  }, []);
+
+  // Load Leaflet CSS and JS
+  useEffect(() => {
+    // Check if Leaflet is already loaded
+    if (window.L) {
+      setLeafletLoaded(true);
+      return;
+    }
+
+    // Load Leaflet CSS
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+    link.crossOrigin = '';
+    document.head.appendChild(link);
+
+    // Load Leaflet JS
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    script.crossOrigin = '';
+    script.async = true;
+    
+    script.onload = () => {
+      console.log('Leaflet loaded successfully');
+      setLeafletLoaded(true);
+    };
+    
+    script.onerror = () => {
+      console.error('Failed to load Leaflet');
+      setLocationError("Failed to load map library. Please check your internet connection.");
+    };
+
+    document.head.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      // Don't remove the CSS as it might be used by other components
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
   }, []);
 
   // Enhanced reverse geocoding function
@@ -74,38 +129,6 @@ const RouteFinder = () => {
     return placeName || null;
   };
 
-  // Check if location is within Panglao municipality
-  const checkPanglaoBoundary = (address) => {
-    if (!address) return false;
-    
-    console.log('Address details:', address); // For debugging
-    
-    // Check if the location is within Panglao municipality
-    // OpenStreetMap might use different field names, so check multiple possibilities
-    const hasPanglaoMunicipality = 
-      address.municipality === 'Panglao' ||
-      address.town === 'Panglao' ||
-      address.city === 'Panglao' ||
-      address.county === 'Panglao';
-    
-    const hasBoholProvince = 
-      address.state === 'Bohol' || 
-      address.province === 'Bohol' ||
-      address.region === 'Bohol';
-    
-    const hasCentralVisayas = 
-      address.region === 'Central Visayas' ||
-      address.region === 'Region VII';
-    
-    // Also check if the display name contains "Panglao, Bohol"
-    const displayName = address._displayName || '';
-    const hasPanglaoInDisplay = displayName.includes('Panglao, Bohol') || 
-                                displayName.includes('Panglao');
-    
-    // Official tariff applies if it's clearly in Panglao, Bohol
-    return (hasPanglaoMunicipality && hasBoholProvince) || hasPanglaoInDisplay;
-  };
-
   // Enhanced location name fetcher with boundary check
   const fetchEnhancedLocationName = async (lat, lng) => {
     try {
@@ -139,11 +162,20 @@ const RouteFinder = () => {
 
       setOriginDetails(newOriginDetails);
 
-      // Check if within Panglao municipality using address details
+      // Check jurisdiction boundaries
       const withinPanglao = checkPanglaoBoundary(address);
+      const withinTagbilaran = checkTagbilaranBoundary(address);
+      const detectedLocationType = determineLocationType(address);
+      
       setIsWithinPanglao(withinPanglao);
+      setIsWithinTagbilaran(withinTagbilaran);
+      setLocationType(detectedLocationType);
 
-      console.log('Within Panglao check result:', withinPanglao);
+      console.log('Jurisdiction check results:', {
+        withinPanglao,
+        withinTagbilaran,
+        locationType: detectedLocationType
+      });
 
       // If no specific place found, try with lower zoom level for broader area
       if (!placeName) {
@@ -160,7 +192,12 @@ const RouteFinder = () => {
         
         // Re-check boundary with broader data
         const broaderWithinPanglao = checkPanglaoBoundary(broaderData.address);
+        const broaderWithinTagbilaran = checkTagbilaranBoundary(broaderData.address);
+        const broaderLocationType = determineLocationType(broaderData.address);
+        
         setIsWithinPanglao(broaderWithinPanglao);
+        setIsWithinTagbilaran(broaderWithinTagbilaran);
+        setLocationType(broaderLocationType);
       }
       
       // Final fallback - use coordinates with context
@@ -169,6 +206,8 @@ const RouteFinder = () => {
     } catch (err) {
       // Set to false if geocoding fails
       setIsWithinPanglao(false);
+      setIsWithinTagbilaran(false);
+      setLocationType('outside');
       
       // Set fallback fullAddress on error
       setOriginDetails({
@@ -267,6 +306,93 @@ const RouteFinder = () => {
     }
   };
 
+  // Initialize map when location and Leaflet are available
+  useEffect(() => {
+    if (location && leafletLoaded && !mapInitialized && mapRef.current) {
+      console.log('Initializing map...');
+      
+      const L = window.L;
+      try {
+        // Clear any existing map
+        if (mapRef.current.leafletMap) {
+          mapRef.current.leafletMap.remove();
+        }
+
+        const map = L.map(mapRef.current).setView(
+          [location.latitude, location.longitude],
+          15
+        );
+        
+        // Store map instance in ref
+        mapRef.current.leafletMap = map;
+
+        // Add tile layer
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(map);
+
+        // Add click event listener to the map
+        map.on('click', async function(e) {
+          const { lat, lng } = e.latlng;
+          setClickedCoords({ lat, lng });
+          
+          // Get detailed address for clicked location
+          const placeName = await getDetailedAddressForCoordinates(lat, lng);
+          setClickedAddress(placeName);
+          
+          // Remove previous click marker if exists
+          if (mapRef.current.clickMarker) {
+            map.removeLayer(mapRef.current.clickMarker);
+          }
+          
+          // Add marker for clicked location
+          mapRef.current.clickMarker = L.marker([lat, lng], {
+            icon: L.icon({
+              iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+              shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41],
+            }),
+          })
+            .addTo(map)
+            .bindPopup(`
+              <strong>📍 Clicked Location</strong><br/>
+              Fetching address...<br/>
+              Lat: ${lat.toFixed(6)}<br/>
+              Lng: ${lng.toFixed(6)}
+            `)
+            .openPopup();
+        });
+
+        // Add origin marker with initial popup
+        L.marker([location.latitude, location.longitude], {
+          icon: L.icon({
+            iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          }),
+        })
+          .addTo(map)
+          .bindPopup(
+            `<strong>📍 Your Location</strong><br/>Fetching address...<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
+          );
+
+        setMapInitialized(true);
+        console.log('Map initialized successfully');
+        
+      } catch (error) {
+        console.error('Error initializing map:', error);
+        setLocationError("Failed to initialize map. Please refresh the page.");
+      }
+    }
+  }, [location, leafletLoaded, mapInitialized]);
+
   // Update marker popups when address data is available
   const updateMarkerPopups = () => {
     if (!mapRef.current?.leafletMap) return;
@@ -319,6 +445,67 @@ const RouteFinder = () => {
   useEffect(() => {
     updateMarkerPopups();
   }, [originDetails, clickedDetails, destinationDetails, originAddressLoading, clickedAddressLoading, destinationAddressLoading]);
+
+  // Draw route on map when route is updated
+  useEffect(() => {
+    if (route && destinationCoords && mapRef.current?.leafletMap) {
+      const L = window.L;
+      const map = mapRef.current.leafletMap;
+
+      // Remove existing route and destination marker
+      map.eachLayer((layer) => {
+        if (layer.options?.className === "route-line") {
+          map.removeLayer(layer);
+        }
+        if (layer.options?.isDestinationMarker) {
+          map.removeLayer(layer);
+        }
+      });
+
+      const routeCoords = route.coordinates.map((coord) => [
+        coord[1],
+        coord[0],
+      ]);
+      
+      // Add route line
+      L.polyline(routeCoords, {
+        color: "#ff6b6b",
+        weight: 4,
+        opacity: 0.8,
+        className: "route-line",
+      }).addTo(map);
+
+      // Add destination marker with initial popup
+      const destinationMarker = L.marker(destinationCoords, {
+        icon: L.icon({
+          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        }),
+        isDestinationMarker: true,
+      })
+        .addTo(map)
+        .bindPopup(
+          `<strong>🎯 Destination</strong><br/>Fetching address...<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
+        )
+        .openPopup();
+
+      // Fetch destination details and update popup
+      fetchDestinationDetails(destinationCoords[0], destinationCoords[1]).then((destinationAddress) => {
+        // Popup will be updated automatically via the updateMarkerPopups function
+      });
+
+      // Fit map to show both origin and destination
+      const bounds = L.latLngBounds(
+        [location.latitude, location.longitude],
+        destinationCoords
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [route, destinationCoords, destination, location]);
 
   // Enhanced geolocation with better error handling
   const requestLocation = () => {
@@ -396,174 +583,6 @@ const RouteFinder = () => {
   useEffect(() => {
     requestLocation();
   }, []);
-
-  // Calculate fare based on distance and passenger type
-  const calculateFare = (distanceKm, pType) => {
-    const FIRST_KM_FARE = 20;
-    const SUCCEEDING_KM_FARE = 5;
-    const DISCOUNT = 5;
-
-    let fare;
-    if (distanceKm <= 1) {
-      fare = FIRST_KM_FARE;
-    } else {
-      const remainingKm = distanceKm - 1;
-      fare = FIRST_KM_FARE + remainingKm * SUCCEEDING_KM_FARE;
-    }
-
-    if (pType !== "regular") {
-      fare -= DISCOUNT;
-    }
-
-    return Math.max(fare, 0);
-  };
-
-  // Initialize Leaflet map with click handler
-  useEffect(() => {
-    if (location && !mapInitialized && mapRef.current) {
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.async = true;
-      script.onload = () => {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(link);
-
-        setTimeout(() => {
-          const L = window.L;
-          if (L && mapRef.current) {
-            const map = L.map(mapRef.current).setView(
-              [location.latitude, location.longitude],
-              15
-            );
-            mapRef.current.leafletMap = map;
-
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-              attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19,
-            }).addTo(map);
-
-            // Add click event listener to the map
-            map.on('click', async function(e) {
-              const { lat, lng } = e.latlng;
-              setClickedCoords({ lat, lng });
-              
-              // Get detailed address for clicked location
-              const placeName = await getDetailedAddressForCoordinates(lat, lng);
-              setClickedAddress(placeName);
-              
-              // Remove previous click marker if exists
-              if (mapRef.current.clickMarker) {
-                map.removeLayer(mapRef.current.clickMarker);
-              }
-              
-              // Add marker for clicked location
-              mapRef.current.clickMarker = L.marker([lat, lng], {
-                icon: L.icon({
-                  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-                  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-                  iconSize: [25, 41],
-                  iconAnchor: [12, 41],
-                  popupAnchor: [1, -34],
-                  shadowSize: [41, 41],
-                }),
-              })
-                .addTo(map)
-                .bindPopup(`
-                  <strong>📍 Clicked Location</strong><br/>
-                  Fetching address...<br/>
-                  Lat: ${lat.toFixed(6)}<br/>
-                  Lng: ${lng.toFixed(6)}
-                `)
-                .openPopup();
-            });
-
-            // Add origin marker with initial popup
-            L.marker([location.latitude, location.longitude], {
-              icon: L.icon({
-                iconUrl:
-                  "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-                shadowUrl:
-                  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41],
-              }),
-            })
-              .addTo(map)
-              .bindPopup(
-                `<strong>📍 Your Location</strong><br/>Fetching address...<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
-              );
-
-            setMapInitialized(true);
-          }
-        }, 100);
-      };
-      document.body.appendChild(script);
-    }
-  }, [location, mapInitialized]);
-
-  // Draw route on map when route is updated
-  useEffect(() => {
-    if (route && destinationCoords && mapRef.current?.leafletMap) {
-      const L = window.L;
-      const map = mapRef.current.leafletMap;
-
-      map.eachLayer((layer) => {
-        if (layer.options?.className === "route-line") {
-          map.removeLayer(layer);
-        }
-        if (layer.options?.isDestinationMarker) {
-          map.removeLayer(layer);
-        }
-      });
-
-      const routeCoords = route.coordinates.map((coord) => [
-        coord[1],
-        coord[0],
-      ]);
-      L.polyline(routeCoords, {
-        color: "#ff6b6b",
-        weight: 4,
-        opacity: 0.8,
-        className: "route-line",
-      }).addTo(map);
-
-      // Add destination marker with initial popup
-      const destinationMarker = L.marker(destinationCoords, {
-        icon: L.icon({
-          iconUrl:
-            "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-          shadowUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
-        isDestinationMarker: true,
-      })
-        .addTo(map)
-        .bindPopup(
-          `<strong>🎯 Destination</strong><br/>Fetching address...<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
-        )
-        .openPopup();
-
-      // Fetch destination details and update popup
-      fetchDestinationDetails(destinationCoords[0], destinationCoords[1]).then((destinationAddress) => {
-        // Popup will be updated automatically via the updateMarkerPopups function
-      });
-
-      const bounds = L.latLngBounds(
-        [location.latitude, location.longitude],
-        destinationCoords
-      );
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [route, destinationCoords, destination, location]);
 
   // Handle destination search
   const handleSearchDestination = async (e) => {
@@ -648,9 +667,9 @@ const RouteFinder = () => {
             </span>
           ) : (
             <span className="text-red-800">
-              {type === "origin" && "📍 Outside Panglao Municipality:"}
-              {type === "clicked" && "📍 Clicked Location (Outside Panglao):"}
-              {type === "destination" && "🎯 Destination (Outside Panglao):"}
+              {type === "origin" && "📍 Outside Jurisdiction:"}
+              {type === "clicked" && "📍 Clicked Location (Outside Jurisdiction):"}
+              {type === "destination" && "🎯 Destination (Outside Jurisdiction):"}
             </span>
           )}
         </p>
@@ -677,12 +696,12 @@ const RouteFinder = () => {
               <p className="text-sm mt-1">
                 {isWithinBoundary ? (
                   <span className={`text-${withinColor}-700`}>
-                    Barangay {details.barangay}, {details.municipality || 'Panglao'}, {details.province || 'Bohol'}
+                    Barangay {details.barangay}, {details.municipality || details.city || 'Unknown'}, {details.province || 'Bohol'}
                   </span>
                 ) : (
                   <span className="text-red-700">
                     {details.municipality ? `${details.municipality}, ` : ""}
-                    {details.province || "Outside Panglao"}
+                    {details.province || "Outside Jurisdiction"}
                   </span>
                 )}
               </p>
@@ -814,13 +833,13 @@ const RouteFinder = () => {
       );
     }
 
-    if (isWithinPanglao === true) {
+    if (locationType === 'panglao') {
       return (
         <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200">
           <div className="flex items-center gap-3">
             <CheckCircle className="w-6 h-6 text-green-600" />
             <div>
-              <h4 className="font-bold text-green-800 text-lg">BiyaFare</h4>
+              <h4 className="font-bold text-green-800 text-lg">BiyaFare - Panglao Municipality</h4>
               <p className="text-green-700 text-sm mt-1">
                 Official tariff fares apply for tricycles and motorcycles in Panglao, Bohol.
               </p>
@@ -830,15 +849,31 @@ const RouteFinder = () => {
       );
     }
 
-    if (isWithinPanglao === false && location) {
+    if (locationType === 'tagbilaran') {
+      return (
+        <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-6 h-6 text-blue-600" />
+            <div>
+              <h4 className="font-bold text-blue-800 text-lg">BiyaFare - Tagbilaran City</h4>
+              <p className="text-blue-700 text-sm mt-1">
+                Official tariff fares apply for tricycles and motorcycles in Tagbilaran City, Bohol.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (locationType === 'outside' && location) {
       return (
         <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-6 h-6 text-red-600" />
             <div>
-              <h4 className="font-bold text-red-800 text-lg">❌ Outside Panglao Municipality</h4>
+              <h4 className="font-bold text-red-800 text-lg">❌ Outside Jurisdiction</h4>
               <p className="text-red-700 text-sm mt-1">
-                Official tariff fares do not apply. Your location is outside Panglao jurisdiction.
+                Official tariff fares do not apply. Your location is outside Panglao and Tagbilaran jurisdictions.
               </p>
             </div>
           </div>
@@ -853,27 +888,27 @@ const RouteFinder = () => {
   const renderClickedCoordinates = () => {
     if (!clickedCoords) return null;
 
-    const isClickedWithinPanglao = checkPanglaoBoundary(clickedCoords.lat, clickedCoords.lng);
+    const isClickedWithinJurisdiction = locationType !== 'outside';
 
     return renderAddressDisplay(
       clickedAddress,
       clickedDetails,
       clickedAddressLoading,
-      isClickedWithinPanglao,
+      isClickedWithinJurisdiction,
       "clicked"
     );
   };
 
-  // Render fare calculation section only when within Panglao
+  // Render fare calculation section only when within jurisdiction
   const renderFareCalculation = () => {
-    if (!isWithinPanglao) {
+    if (locationType === 'outside') {
       return (
         <div className="bg-gray-50 rounded-xl p-6 border-2 border-gray-300">
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h4 className="font-bold text-gray-700 text-lg mb-2">Fare Calculation Not Available</h4>
             <p className="text-gray-600 text-sm">
-              Official tariff fares only apply to trips originating within Panglao Municipality.
+              Official tariff fares only apply to trips originating within Panglao Municipality or Tagbilaran City.
               <br />
               Your current location is outside the jurisdiction.
             </p>
@@ -882,46 +917,104 @@ const RouteFinder = () => {
       );
     }
 
+    const jurisdictionInfo = getJurisdictionInfo(locationType);
+    const fareBreakdown = getFareBreakdown(route.distance, passengerType, locationType);
+
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-200">
-        <h4 className="font-bold text-green-900 text-base mb-4">Route Information & Fare Calculation</h4>
+      <div className={`rounded-lg p-4 border-2 ${
+        locationType === 'tagbilaran' 
+          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200' 
+          : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+      }`}>
+        <h4 className={`font-bold text-base mb-4 ${
+          locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+        }`}>
+          Route Information & Fare Calculation
+        </h4>
         
-        <div className="mb-4 pb-4 border-b border-green-300">
-          <label className="block text-xs font-semibold text-green-900 mb-2">
+        <div className="mb-4 pb-4 border-b border-gray-300">
+          <label className={`block text-xs font-semibold mb-2 ${
+            locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+          }`}>
             <Users className="inline w-4 h-4 mr-1" />
             Passenger Type
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {(["regular", "student", "elderly", "disable"]).map((type) => (
-              <button
-                key={type}
-                onClick={() => setPassengerType(type)}
-                className={`py-1 px-3 rounded-md font-semibold transition-all text-sm ${
-                  passengerType === type
-                    ? "bg-green-600 text-white shadow-md"
-                    : "bg-white text-green-700 border-2 border-green-200 hover:border-green-400"
-                }`}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-                {type !== "regular" && <span className="text-xs ml-1">(-₱5)</span>}
-              </button>
-            ))}
+            {locationType === 'tagbilaran' ? (
+              // Tagbilaran passenger types
+              ["regular", "student", "senior", "below5"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setPassengerType(type)}
+                  className={`py-1 px-3 rounded-md font-semibold transition-all text-sm ${
+                    passengerType === type
+                      ? locationType === 'tagbilaran' 
+                        ? "bg-blue-600 text-white shadow-md" 
+                        : "bg-green-600 text-white shadow-md"
+                      : "bg-white border-2 hover:border-gray-400"
+                  } ${
+                    locationType === 'tagbilaran' 
+                      ? "text-blue-700 border-blue-200" 
+                      : "text-green-700 border-green-200"
+                  }`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {type !== "regular" && (
+                    <span className="text-xs ml-1">
+                      ({type === 'below5' ? '-50%' : '-20%'})
+                    </span>
+                  )}
+                </button>
+              ))
+            ) : (
+              // Panglao passenger types
+              ["regular", "student", "elderly", "disable"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setPassengerType(type)}
+                  className={`py-1 px-3 rounded-md font-semibold transition-all text-sm ${
+                    passengerType === type
+                      ? "bg-green-600 text-white shadow-md"
+                      : "bg-white text-green-700 border-2 border-green-200 hover:border-green-400"
+                  }`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {type !== "regular" && <span className="text-xs ml-1">(-₱5)</span>}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">ORIGIN</p>
-            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-3">
+          <div className={`rounded-md p-3 shadow-sm border ${
+            locationType === 'tagbilaran' 
+              ? 'bg-white border-blue-100' 
+              : 'bg-white border-green-100'
+          }`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${
+              locationType === 'tagbilaran' ? 'text-blue-600' : 'text-green-600'
+            }`}>ORIGIN</p>
+            <p className={`text-sm font-semibold mt-1 line-clamp-3 ${
+              locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+            }`}>
               {originAddressLoading ? "Fetching address..." : (originDetails.fullAddress || originName || "Location")}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {location?.latitude.toFixed(4)}, {location?.longitude.toFixed(4)}
             </p>
           </div>
-          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">DESTINATION</p>
-            <p className="text-sm font-semibold text-green-900 mt-1 line-clamp-3">
+          <div className={`rounded-md p-3 shadow-sm border ${
+            locationType === 'tagbilaran' 
+              ? 'bg-white border-blue-100' 
+              : 'bg-white border-green-100'
+          }`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${
+              locationType === 'tagbilaran' ? 'text-blue-600' : 'text-green-600'
+            }`}>DESTINATION</p>
+            <p className={`text-sm font-semibold mt-1 line-clamp-3 ${
+              locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+            }`}>
               {destinationAddressLoading ? "Fetching address..." : (destinationDetails.fullAddress || destination)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -931,73 +1024,139 @@ const RouteFinder = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-md p-3 shadow-sm border border-green-100">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Distance</p>
-            <p className="text-xl font-bold text-green-900 mt-1">
+          <div className={`rounded-md p-3 shadow-sm border ${
+            locationType === 'tagbilaran' 
+              ? 'bg-white border-blue-100' 
+              : 'bg-white border-green-100'
+          }`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${
+              locationType === 'tagbilaran' ? 'text-blue-600' : 'text-green-600'
+            }`}>Distance</p>
+            <p className={`text-xl font-bold mt-1 ${
+              locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+            }`}>
               {route.distance.toFixed(2)} <span className="text-sm">km</span>
             </p>
           </div>
           <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-md p-3 shadow-sm border border-yellow-300">
             <p className="text-xs text-yellow-900 font-semibold uppercase tracking-wider">Fare ({passengerType})</p>
             <p className="text-2xl font-bold text-yellow-900 mt-1">
-              ₱{calculateFare(route.distance, passengerType).toFixed(0)}
+              ₱{calculateFare(route.distance, passengerType, locationType).toFixed(2)}
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-md p-3 border border-green-200">
-          <h5 className="font-semibold text-green-900 mb-2 text-sm">Fare Breakdown(Per Person)</h5>
+        <div className={`rounded-md p-3 border ${
+          locationType === 'tagbilaran' 
+            ? 'bg-white border-blue-200' 
+            : 'bg-white border-green-200'
+        }`}>
+          <h5 className={`font-semibold mb-2 text-sm ${
+            locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+          }`}>Fare Breakdown (Per Person)</h5>
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-gray-700">
               <span>First 1 km:</span>
-              <span className="font-semibold">₱20.00</span>
+              <span className="font-semibold">₱{fareBreakdown.firstKmRate.toFixed(2)}</span>
             </div>
             {route.distance > 1 && (
               <>
                 <div className="flex justify-between text-gray-700">
-                  <span>Remaining {(route.distance - 1).toFixed(2)} km × ₱5/km:</span>
-                  <span className="font-semibold">₱{((route.distance - 1) * 5).toFixed(2)}</span>
+                  <span>Remaining {(route.distance - 1).toFixed(2)} km × ₱{fareBreakdown.succeedingKmRate.toFixed(2)}/km:</span>
+                  <span className="font-semibold">₱{((route.distance - 1) * fareBreakdown.succeedingKmRate).toFixed(2)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-1 flex justify-between text-gray-900 font-bold">
                   <span>Subtotal:</span>
-                  <span>₱{(route.distance <= 1 ? 20 : 20 + (route.distance - 1) * 5).toFixed(2)}</span>
+                  <span>₱{(fareBreakdown.firstKmRate + (route.distance - 1) * fareBreakdown.succeedingKmRate).toFixed(2)}</span>
                 </div>
               </>
             )}
             {passengerType !== "regular" && (
-              <div className="flex justify-between text-green-700 font-semibold">
+              <div className={`flex justify-between font-semibold ${
+                locationType === 'tagbilaran' ? 'text-blue-700' : 'text-green-700'
+              }`}>
                 <span>Discount ({passengerType}):</span>
-                <span>-₱5.00</span>
+                <span>
+                  {locationType === 'tagbilaran' 
+                    ? passengerType === 'below5' ? '-50%' : '-20%'
+                    : '-₱5.00'
+                  }
+                </span>
               </div>
             )}
-            <div className="border-t-2 border-green-400 pt-1 flex justify-between text-green-900 font-bold text-sm">
+            <div className={`border-t-2 pt-1 flex justify-between font-bold text-sm ${
+              locationType === 'tagbilaran' 
+                ? 'border-blue-400 text-blue-900' 
+                : 'border-green-400 text-green-900'
+            }`}>
               <span>Total Fare:</span>
-              <span>₱{calculateFare(route.distance, passengerType).toFixed(2)}</span>
+              <span>₱{fareBreakdown.totalFare.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-blue-50 rounded-md p-3 border border-blue-200 mt-3">
-          <h5 className="font-semibold text-blue-900 mb-1 text-sm">📍 Jurisdiction Information</h5>
-          <p className="text-xs text-blue-700">
-            ✅ <strong>Official Tariff Applies</strong> - Your trip originates within the jurisdiction of Panglao, Bohol.
+        <div className={`rounded-md p-3 border mt-3 ${
+          locationType === 'tagbilaran' 
+            ? 'bg-blue-50 border-blue-200' 
+            : 'bg-green-50 border-green-200'
+        }`}>
+          <h5 className={`font-semibold mb-1 text-sm ${
+            locationType === 'tagbilaran' ? 'text-blue-900' : 'text-green-900'
+          }`}>📍 Jurisdiction Information</h5>
+          <p className={`text-xs ${
+            locationType === 'tagbilaran' ? 'text-blue-700' : 'text-green-700'
+          }`}>
+            ✅ <strong>Official Tariff Applies</strong> - Your trip originates within the jurisdiction of {jurisdictionInfo.name}.
             {originDetails.barangay && !originAddressLoading && ` You are in Barangay ${originDetails.barangay}.`}
           </p>
-          <div className="mt-2 pt-2 border-t border-blue-200">
-            <p className="text-xs font-semibold text-blue-800 mb-1">Official Fare Structure:</p>
-            <ul className="text-xs text-blue-700 space-y-1">
+          <div className="mt-2 pt-2 border-t border-gray-300">
+            <p className={`text-xs font-semibold mb-1 ${
+              locationType === 'tagbilaran' ? 'text-blue-800' : 'text-green-800'
+            }`}>Official Fare Structure:</p>
+            <ul className={`text-xs space-y-1 ${
+              locationType === 'tagbilaran' ? 'text-blue-700' : 'text-green-700'
+            }`}>
               <li className="flex justify-between">
                 <span>First 1 Kilometer:</span>
-                <span className="font-semibold">20 pesos</span>
+                <span className="font-semibold">
+                  ₱{locationType === 'tagbilaran' ? '15.00' : '20.00'}
+                </span>
               </li>
               <li className="flex justify-between">
                 <span>Every Succeeding Kilometer:</span>
-                <span className="font-semibold">5 pesos</span>
+                <span className="font-semibold">
+                  ₱{locationType === 'tagbilaran' ? '2.00' : '5.00'}
+                </span>
               </li>
             </ul>
           </div>
         </div>
       </div>
+    );
+  };
+
+  // Render map loading state
+  const renderMap = () => {
+    if (!leafletLoaded) {
+      return (
+        <div className="w-full h-96 rounded-xl border border-gray-300 bg-gray-100 flex items-center justify-center">
+          <div className="text-center">
+            <svg className="animate-spin h-8 w-8 text-cyan-600 mx-auto mb-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-gray-600 font-medium">Loading map...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={mapRef}
+        className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100 cursor-pointer"
+        style={{ minHeight: "400px" }}
+      />
     );
   };
 
@@ -1034,16 +1193,10 @@ const RouteFinder = () => {
               </div>
             ) : (
               <>
-                {renderAddressDisplay(originName, originDetails, originAddressLoading, isWithinPanglao, "origin")}
+                {renderAddressDisplay(originName, originDetails, originAddressLoading, locationType !== 'outside', "origin")}
 
-                {/* Clicked coordinates display */}
-                {/* {renderClickedCoordinates()} */}
-
-                <div
-                  ref={mapRef}
-                  className="w-full h-96 rounded-xl border border-gray-300 shadow-inner bg-gray-100 cursor-pointer"
-                  style={{ minHeight: "400px" }}
-                />
+                {renderMap()}
+                
                 <div className="mt-2 text-center">
                   <p className="text-sm text-gray-600">
                     💡 <strong>Click anywhere on the map</strong> to see coordinates and address
