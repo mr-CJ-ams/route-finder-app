@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MapPin, Navigation, Users, AlertCircle, CheckCircle, Smartphone, Settings, Wifi } from "lucide-react";
+import { MapPin, Navigation, Users, AlertCircle, CheckCircle, Smartphone, Settings, Wifi, Search } from "lucide-react";
 import { 
   calculateFare, 
   getFareBreakdown, 
@@ -40,6 +40,12 @@ const RouteFinder = () => {
   const [originAddressLoading, setOriginAddressLoading] = useState(true);
   const [clickedAddressLoading, setClickedAddressLoading] = useState(false);
   const [destinationAddressLoading, setDestinationAddressLoading] = useState(false);
+
+  // New state for search suggestions
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Check if user is on mobile device
   useEffect(() => {
@@ -303,6 +309,113 @@ const RouteFinder = () => {
       return fallbackAddress;
     } finally {
       setDestinationAddressLoading(false);
+    }
+  };
+
+  // NEW: Function to fetch search suggestions
+  const fetchSearchSuggestions = async (query) => {
+  if (!query.trim() || query.length < 2) {
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
+    return;
+  }
+
+  setSuggestionsLoading(true);
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`
+    );
+    const results = await response.json();
+
+    const suggestions = results.map((result, index) => {
+      const address = result.address || {};
+      
+      // Use the display name but extract a cleaner name for the input
+      const displayName = result.display_name;
+      const primaryName = displayName.split(',')[0].trim();
+
+      return {
+        id: index,
+        name: primaryName, // Clean primary name for input field
+        fullAddress: displayName, // Full address for display
+        lat: parseFloat(result.lat),
+        lon: parseFloat(result.lon),
+        type: result.type,
+        class: result.class,
+        address: address
+      };
+    });
+
+    setSearchSuggestions(suggestions);
+    setShowSuggestions(suggestions.length > 0);
+  } catch (error) {
+    console.error('Error fetching search suggestions:', error);
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
+  } finally {
+    setSuggestionsLoading(false);
+  }
+};
+
+  // NEW: Handle destination input change with debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (destination.trim()) {
+        fetchSearchSuggestions(destination);
+      } else {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [destination]);
+
+  // NEW: Handle suggestion selection
+  const handleSuggestionSelect = (suggestion) => {
+    console.log('Selected suggestion:', suggestion); // Debug log
+    // Use the primary name for the input field
+    setDestination(suggestion.name);
+    setDestinationCoords([suggestion.lat, suggestion.lon]);
+    setShowSuggestions(false);
+    
+    // Set destination details with full address for display
+    setDestinationDetails({
+      fullAddress: suggestion.fullAddress,
+      ...suggestion.address
+    });
+
+    // Automatically calculate route if location is available
+    if (location) {
+      calculateRoute(suggestion.lat, suggestion.lon);
+    }
+  };
+
+  // NEW: Calculate route function
+  const calculateRoute = async (destLat, destLon) => {
+    setSearchLoading(true);
+    setSearchError(null);
+
+    try {
+      const routeResponse = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destLon},${destLat}?overview=full&geometries=geojson`
+      );
+      const routeData = await routeResponse.json();
+
+      if (routeData.routes && routeData.routes.length > 0) {
+        const routeInfo = routeData.routes[0];
+        setRoute({
+          distance: routeInfo.distance / 1000,
+          duration: routeInfo.duration / 60,
+          coordinates: routeInfo.geometry.coordinates,
+        });
+      } else {
+        setSearchError("Could not find a route to this destination.");
+      }
+    } catch (err) {
+      setSearchError("Error calculating route. Please try again.");
+    } finally {
+      setSearchLoading(false);
     }
   };
 
@@ -584,7 +697,7 @@ const RouteFinder = () => {
     requestLocation();
   }, []);
 
-  // Handle destination search
+  // Handle destination search (legacy function for form submission)
   const handleSearchDestination = async (e) => {
     e.preventDefault();
     if (!destination.trim() || !location) return;
@@ -607,26 +720,62 @@ const RouteFinder = () => {
       const destLon = parseFloat(results[0].lon);
       setDestinationCoords([destLat, destLon]);
 
-      const routeResponse = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destLon},${destLat}?overview=full&geometries=geojson`
-      );
-      const routeData = await routeResponse.json();
-
-      if (routeData.routes && routeData.routes.length > 0) {
-        const routeInfo = routeData.routes[0];
-        setRoute({
-          distance: routeInfo.distance / 1000,
-          duration: routeInfo.duration / 60,
-          coordinates: routeInfo.geometry.coordinates,
-        });
-      } else {
-        setSearchError("Could not find a route to this destination.");
-      }
+      await calculateRoute(destLat, destLon);
     } catch (err) {
       setSearchError("Error searching destination. Please try again.");
     } finally {
       setSearchLoading(false);
     }
+  };
+
+  // NEW: Render search suggestions dropdown
+  const renderSearchSuggestions = () => {
+    if (!showSuggestions || searchSuggestions.length === 0) return null;
+
+    return (
+      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto mt-1">
+        {suggestionsLoading ? (
+          <div className="p-4 text-center text-gray-500">
+            <svg className="animate-spin h-5 w-5 mx-auto mb-2" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            Searching...
+          </div>
+        ) : (
+          searchSuggestions.map((suggestion) => (
+            <div
+              key={suggestion.id}
+              className="p-3 border-b border-gray-100 hover:bg-cyan-50 cursor-pointer transition-colors duration-150"
+              onMouseDown={(e) => {
+                e.preventDefault(); // Prevent input blur
+                handleSuggestionSelect(suggestion);
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <Search className="w-4 h-4 text-cyan-600 mt-1 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm truncate">
+                    {suggestion.name}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                    {suggestion.fullAddress}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-500">
+                      {suggestion.lat.toFixed(4)}, {suggestion.lon.toFixed(4)}
+                    </span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                      {suggestion.type}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
   };
 
   // Render address display with complete address format
@@ -948,7 +1097,7 @@ const RouteFinder = () => {
                   onClick={() => setPassengerType(type)}
                   className={`py-1 px-3 rounded-md font-semibold transition-all text-sm ${
                     passengerType === type
-                      ? locationType === 'tagbilaran' 
+                      ? locationType === 'tagbitaran' 
                         ? "bg-blue-600 text-white shadow-md" 
                         : "bg-green-600 text-white shadow-md"
                       : "bg-white border-2 hover:border-gray-400"
@@ -1232,34 +1381,52 @@ const RouteFinder = () => {
             ) : (
               <>
                 <form onSubmit={handleSearchDestination} className="mb-6">
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <input
-                      type="text"
-                      value={destination}
-                      onChange={(e) => {
-                        setDestination(e.target.value);
-                        setSearchError(null);
-                      }}
-                      placeholder="Enter destination (e.g., 'Panglao Island', 'Airport', address, etc.)"
-                      className="flex-1 px-5 py-3 rounded-xl border-2 border-cyan-200 focus:border-cyan-500 focus:outline-none transition-colors bg-cyan-50 text-gray-800 placeholder-gray-500 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      disabled={searchLoading || !destination.trim()}
-                      className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl hover:from-orange-600 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-                    >
-                      {searchLoading ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                          </svg>
-                          Searching...
-                        </span>
-                      ) : (
-                        "Calculate Fare"
-                      )}
-                    </button>
+                  <div className="relative">
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="flex-1 relative">
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={destination}
+                          onChange={(e) => {
+                            setDestination(e.target.value);
+                            setSearchError(null);
+                          }}
+                          onFocus={() => {
+                            if (searchSuggestions.length > 0) {
+                              setShowSuggestions(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            // Use setTimeout to allow click event to fire first
+                            setTimeout(() => setShowSuggestions(false), 200);
+                          }}
+                          placeholder="Enter destination (e.g., 'Alona Beach', 'Panglao Island', 'Airport', address, etc.)"
+                          className="w-full px-5 py-3 rounded-xl border-2 border-cyan-200 focus:border-cyan-500 focus:outline-none transition-colors bg-cyan-50 text-gray-800 placeholder-gray-500 font-medium"
+                        />
+                        {renderSearchSuggestions()}
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={searchLoading || !destination.trim()}
+                        className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl hover:from-orange-600 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                      >
+                        {searchLoading ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            Searching...
+                          </span>
+                        ) : (
+                          "Calculate Fare"
+                        )}
+                      </button>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600">
+                      💡 <strong>Start typing</strong> to see search suggestions (e.g., "Alona" for Alona Beach)
+                    </div>
                   </div>
                 </form>
 
