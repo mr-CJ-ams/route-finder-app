@@ -22,6 +22,8 @@ const RouteFinder = () => {
   // New state for clicked coordinates
   const [clickedCoords, setClickedCoords] = useState(null);
   const [clickedAddress, setClickedAddress] = useState(null);
+  const [clickedDetails, setClickedDetails] = useState({});
+  const [destinationDetails, setDestinationDetails] = useState({});
 
   // Check if user is on mobile device
   useEffect(() => {
@@ -96,8 +98,8 @@ const RouteFinder = () => {
       const address = data.address || {};
       let placeName = getDetailedAddress(data);
       
-      // Store detailed address information - ALWAYS set fullAddress from data.display_name
-      const originDetails = {
+      // Store detailed address information
+      const newOriginDetails = {
         road: address.road,
         neighbourhood: address.neighbourhood,
         suburb: address.suburb,
@@ -106,10 +108,10 @@ const RouteFinder = () => {
         municipality: address.municipality,
         city: address.city,
         province: address.state,
-        fullAddress: data.display_name // This should always be available
+        fullAddress: data.display_name
       };
 
-      setOriginDetails(originDetails);
+      setOriginDetails(newOriginDetails);
 
       // Check if within Panglao municipality
       const withinPanglao = checkPanglaoBoundary(lat, lng);
@@ -125,7 +127,7 @@ const RouteFinder = () => {
         setOriginDetails(prev => ({
           ...prev,
           ...broaderData.address,
-          fullAddress: broaderData.display_name // Ensure this is set
+          fullAddress: broaderData.display_name
         }));
       }
       
@@ -137,7 +139,7 @@ const RouteFinder = () => {
       const withinPanglao = checkPanglaoBoundary(lat, lng);
       setIsWithinPanglao(withinPanglao);
       
-      // Set fallback fullAddress even on error
+      // Set fallback fullAddress on error
       setOriginDetails({
         fullAddress: `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`
       });
@@ -146,20 +148,83 @@ const RouteFinder = () => {
     }
   };
 
-  // Function to get address for clicked coordinates
-  const getAddressForCoordinates = async (lat, lng) => {
+  // Function to get detailed address for clicked coordinates
+  const getDetailedAddressForCoordinates = async (lat, lng) => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=16`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
       );
       const data = await response.json();
       
-      if (data && data.display_name) {
-        return data.display_name;
+      const address = data.address || {};
+      let placeName = getDetailedAddress(data);
+      
+      // Store detailed address information for clicked location
+      const newClickedDetails = {
+        road: address.road,
+        neighbourhood: address.neighbourhood,
+        suburb: address.suburb,
+        barangay: address.barangay,
+        village: address.village,
+        municipality: address.municipality,
+        city: address.city,
+        province: address.state,
+        fullAddress: data.display_name
+      };
+
+      setClickedDetails(newClickedDetails);
+
+      // If no specific place found, try with lower zoom level for broader area
+      if (!placeName) {
+        const broaderResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=14`
+        );
+        const broaderData = await broaderResponse.json();
+        placeName = getDetailedAddress(broaderData);
+        setClickedDetails(prev => ({
+          ...prev,
+          ...broaderData.address,
+          fullAddress: broaderData.display_name
+        }));
       }
-      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      
+      // Final fallback - use coordinates with context
+      return placeName || `Location near ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      
     } catch (err) {
-      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      return `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
+  // Function to get detailed address for destination
+  const fetchDestinationDetails = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
+      );
+      const data = await response.json();
+      
+      const address = data.address || {};
+      
+      // Store detailed address information for destination
+      const newDestinationDetails = {
+        road: address.road,
+        neighbourhood: address.neighbourhood,
+        suburb: address.suburb,
+        barangay: address.barangay,
+        village: address.village,
+        municipality: address.municipality,
+        city: address.city,
+        province: address.state,
+        fullAddress: data.display_name
+      };
+
+      setDestinationDetails(newDestinationDetails);
+      return data.display_name;
+    } catch (err) {
+      const fallbackAddress = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      setDestinationDetails({ fullAddress: fallbackAddress });
+      return fallbackAddress;
     }
   };
 
@@ -293,9 +358,9 @@ const RouteFinder = () => {
               const { lat, lng } = e.latlng;
               setClickedCoords({ lat, lng });
               
-              // Get address for clicked location
-              const address = await getAddressForCoordinates(lat, lng);
-              setClickedAddress(address);
+              // Get detailed address for clicked location
+              const placeName = await getDetailedAddressForCoordinates(lat, lng);
+              setClickedAddress(placeName);
               
               // Remove previous click marker if exists
               if (mapRef.current.clickMarker) {
@@ -316,29 +381,29 @@ const RouteFinder = () => {
                 .addTo(map)
                 .bindPopup(`
                   <strong>📍 Clicked Location</strong><br/>
-                  ${clickedDetails.fullAddress || clickedAddress}<br/>
+                  ${clickedDetails.fullAddress || clickedAddress || 'Fetching address...'}<br/>
                   Lat: ${lat.toFixed(6)}<br/>
                   Lng: ${lng.toFixed(6)}
                 `)
                 .openPopup();
             });
 
-           L.marker([location.latitude, location.longitude], {
-            icon: L.icon({
-              iconUrl:
-                "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-              shadowUrl:
-                "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41],
-            }),
-          })
-            .addTo(map)
-            .bindPopup(
-              `<strong>📍 Your Location</strong><br/>${originDetails.fullAddress || originName || 'Location details unavailable'}<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
-            );
+            L.marker([location.latitude, location.longitude], {
+              icon: L.icon({
+                iconUrl:
+                  "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+                shadowUrl:
+                  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41],
+              }),
+            })
+              .addTo(map)
+              .bindPopup(
+                `<strong>📍 Your Location</strong><br/>${originDetails.fullAddress || 'Fetching address...'}<br/>Lat: ${location.latitude.toFixed(6)}<br/>Lng: ${location.longitude.toFixed(6)}`
+              );
 
             setMapInitialized(true);
           }
@@ -346,7 +411,7 @@ const RouteFinder = () => {
       };
       document.body.appendChild(script);
     }
-  }, [location, mapInitialized, originName]);
+  }, [location, mapInitialized, originName, originDetails, clickedDetails, clickedAddress]);
 
   // Draw route on map when route is updated
   useEffect(() => {
@@ -374,24 +439,27 @@ const RouteFinder = () => {
         className: "route-line",
       }).addTo(map);
 
-     L.marker(destinationCoords, {
-        icon: L.icon({
-          iconUrl:
-            "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-          shadowUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41],
-        }),
-        isDestinationMarker: true,
-      })
-        .addTo(map)
-        .bindPopup(
-          `<strong>🎯 Destination</strong><br/>${clickedDetails.fullAddress || destination}<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
-        )
-        .openPopup();
+      // Fetch destination details and then add marker
+      fetchDestinationDetails(destinationCoords[0], destinationCoords[1]).then((destinationAddress) => {
+        L.marker(destinationCoords, {
+          icon: L.icon({
+            iconUrl:
+              "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+            shadowUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          }),
+          isDestinationMarker: true,
+        })
+          .addTo(map)
+          .bindPopup(
+            `<strong>🎯 Destination</strong><br/>${destinationDetails.fullAddress || destinationAddress || destination}<br/>Lat: ${destinationCoords[0].toFixed(6)}<br/>Lng: ${destinationCoords[1].toFixed(6)}`
+          )
+          .openPopup();
+      });
 
       const bounds = L.latLngBounds(
         [location.latitude, location.longitude],
@@ -399,7 +467,7 @@ const RouteFinder = () => {
       );
       map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [route, destinationCoords, destination, location]);
+  }, [route, destinationCoords, destination, location, destinationDetails]);
 
   // Handle destination search
   const handleSearchDestination = async (e) => {
@@ -602,37 +670,66 @@ const RouteFinder = () => {
     return null;
   };
 
-  // Render clicked coordinates information
+  // Render clicked coordinates information in the same format as Origin
   const renderClickedCoordinates = () => {
     if (!clickedCoords) return null;
 
+    const isClickedWithinPanglao = checkPanglaoBoundary(clickedCoords.lat, clickedCoords.lng);
+
     return (
-      <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200 mt-4">
-        <div className="flex items-start gap-3">
-          <MapPin className="w-6 h-6 text-blue-600 mt-1" />
-          <div className="flex-1">
-            <h4 className="font-bold text-blue-800 text-lg mb-2">📍 Clicked Location</h4>
-            <div className="space-y-2">
-              <div>
-                <p className="text-sm font-semibold text-blue-700">Coordinates:</p>
-                <p className="text-sm font-mono text-blue-900">
-                  Latitude: {clickedCoords.lat.toFixed(6)}<br />
-                  Longitude: {clickedCoords.lng.toFixed(6)}
-                </p>
-              </div>
-              {clickedAddress && (
-                <div>
-                  <p className="text-sm font-semibold text-blue-700">Address:</p>
-                  <p className="text-sm text-blue-900">{clickedAddress}</p>
-                </div>
-              )}
-              <div className="mt-2 pt-2 border-t border-blue-200">
-                <p className="text-xs text-blue-600">
-                  💡 <strong>Tip:</strong> Click anywhere on the map to see coordinates and address
-                </p>
-              </div>
-            </div>
-          </div>
+      <div
+        className={`rounded-xl px-4 pt-3 pb-1 mb-6 border-2 ${
+          isClickedWithinPanglao
+            ? "bg-blue-50 border-blue-200"
+            : "bg-purple-50 border-purple-200"
+        }`}
+      >
+        <p className="text-sm font-semibold mb-2">
+          {isClickedWithinPanglao ? (
+            <span className="text-blue-800">📍 Clicked Location (Within Panglao):</span>
+          ) : (
+            <span className="text-purple-800">📍 Clicked Location (Outside Panglao):</span>
+          )}
+        </p>
+
+        <p
+          className={`text-lg font-bold ${
+            isClickedWithinPanglao ? "text-blue-900" : "text-purple-900"
+          }`}
+        >
+          {clickedAddress}
+        </p>
+
+        {clickedDetails.barangay && (
+          <p className="text-sm mt-1">
+            {isClickedWithinPanglao ? (
+              <span className="text-blue-700">
+                Barangay {clickedDetails.barangay}, Panglao, Bohol
+              </span>
+            ) : (
+              <span className="text-purple-700">
+                {clickedDetails.municipality ? `${clickedDetails.municipality}, ` : ""}
+                {clickedDetails.province || "Outside Panglao"}
+              </span>
+            )}
+          </p>
+        )}
+
+        {/* Latitude & Longitude */}
+        <div
+          className={`mt-1 pt-1 border-t ${
+            isClickedWithinPanglao ? "border-blue-200" : "border-purple-200"
+          }`}
+        >
+          <p className="text-xs font-mono">
+            <span className="text-blue-700">
+              Latitude: {clickedCoords.lat.toFixed(6)}
+            </span>
+            <br />
+            <span className="text-purple-700">
+              Longitude: {clickedCoords.lng.toFixed(6)}
+            </span>
+          </p>
         </div>
       </div>
     );
@@ -871,7 +968,7 @@ const RouteFinder = () => {
                   </div>
                 )}
 
-                {/* Clicked coordinates display */}
+                {/* Clicked coordinates display - now in the same format as Origin */}
                 {renderClickedCoordinates()}
 
                 <div
