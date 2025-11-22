@@ -38,14 +38,6 @@ const RouteFinder = () => {
     setIsMobile(checkMobile());
   }, []);
 
-  // Panglao Municipality Boundary Coordinates (approximate bounding box)
-  const PANGLAO_BOUNDARY = {
-    minLat: 9.5000,  // Southern boundary
-    maxLat: 9.6500,  // Northern boundary  
-    minLng: 123.7500, // Western boundary
-    maxLng: 123.8500  // Eastern boundary
-  };
-
   // Enhanced reverse geocoding function
   const getDetailedAddress = (data) => {
     const address = data.address || {};
