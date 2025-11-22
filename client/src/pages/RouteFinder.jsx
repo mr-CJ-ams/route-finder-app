@@ -86,13 +86,32 @@ const RouteFinder = () => {
   const checkPanglaoBoundary = (address) => {
     if (!address) return false;
     
-    // Check if the location is within Panglao municipality
-    const hasPanglaoMunicipality = address.municipality === 'Panglao';
-    const hasBoholProvince = address.state === 'Bohol' || address.province === 'Bohol';
-    const hasCentralVisayas = address.region === 'Central Visayas';
+    console.log('Address details:', address); // For debugging
     
-    // Official tariff applies only for Panglao, Bohol, Central Visayas
-    return hasPanglaoMunicipality && hasBoholProvince && hasCentralVisayas;
+    // Check if the location is within Panglao municipality
+    // OpenStreetMap might use different field names, so check multiple possibilities
+    const hasPanglaoMunicipality = 
+      address.municipality === 'Panglao' ||
+      address.town === 'Panglao' ||
+      address.city === 'Panglao' ||
+      address.county === 'Panglao';
+    
+    const hasBoholProvince = 
+      address.state === 'Bohol' || 
+      address.province === 'Bohol' ||
+      address.region === 'Bohol';
+    
+    const hasCentralVisayas = 
+      address.region === 'Central Visayas' ||
+      address.region === 'Region VII';
+    
+    // Also check if the display name contains "Panglao, Bohol"
+    const displayName = address._displayName || '';
+    const hasPanglaoInDisplay = displayName.includes('Panglao, Bohol') || 
+                                displayName.includes('Panglao');
+    
+    // Official tariff applies if it's clearly in Panglao, Bohol
+    return (hasPanglaoMunicipality && hasBoholProvince) || hasPanglaoInDisplay;
   };
 
   // Enhanced location name fetcher with boundary check
@@ -104,7 +123,12 @@ const RouteFinder = () => {
       );
       const data = await response.json();
       
+      console.log('Full geocoding response:', data); // Debugging
+      
       const address = data.address || {};
+      // Add the display name to the address object for checking
+      address._displayName = data.display_name;
+      
       let placeName = getDetailedAddress(data);
       
       // Store detailed address information
@@ -126,6 +150,8 @@ const RouteFinder = () => {
       // Check if within Panglao municipality using address details
       const withinPanglao = checkPanglaoBoundary(address);
       setIsWithinPanglao(withinPanglao);
+
+      console.log('Within Panglao check result:', withinPanglao);
 
       // If no specific place found, try with lower zoom level for broader area
       if (!placeName) {
