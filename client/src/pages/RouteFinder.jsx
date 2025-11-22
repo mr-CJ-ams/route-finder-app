@@ -83,13 +83,16 @@ const RouteFinder = () => {
   };
 
   // Check if location is within Panglao municipality
-  const checkPanglaoBoundary = (lat, lng) => {
-    return (
-      lat >= PANGLAO_BOUNDARY.minLat &&
-      lat <= PANGLAO_BOUNDARY.maxLat &&
-      lng >= PANGLAO_BOUNDARY.minLng &&
-      lng <= PANGLAO_BOUNDARY.maxLng
-    );
+  const checkPanglaoBoundary = (address) => {
+    if (!address) return false;
+    
+    // Check if the location is within Panglao municipality
+    const hasPanglaoMunicipality = address.municipality === 'Panglao';
+    const hasBoholProvince = address.state === 'Bohol' || address.province === 'Bohol';
+    const hasCentralVisayas = address.region === 'Central Visayas';
+    
+    // Official tariff applies only for Panglao, Bohol, Central Visayas
+    return hasPanglaoMunicipality && hasBoholProvince && hasCentralVisayas;
   };
 
   // Enhanced location name fetcher with boundary check
@@ -114,13 +117,14 @@ const RouteFinder = () => {
         municipality: address.municipality,
         city: address.city,
         province: address.state,
+        region: address.region,
         fullAddress: data.display_name
       };
 
       setOriginDetails(newOriginDetails);
 
-      // Check if within Panglao municipality
-      const withinPanglao = checkPanglaoBoundary(lat, lng);
+      // Check if within Panglao municipality using address details
+      const withinPanglao = checkPanglaoBoundary(address);
       setIsWithinPanglao(withinPanglao);
 
       // If no specific place found, try with lower zoom level for broader area
@@ -135,15 +139,18 @@ const RouteFinder = () => {
           ...broaderData.address,
           fullAddress: broaderData.display_name
         }));
+        
+        // Re-check boundary with broader data
+        const broaderWithinPanglao = checkPanglaoBoundary(broaderData.address);
+        setIsWithinPanglao(broaderWithinPanglao);
       }
       
       // Final fallback - use coordinates with context
       return placeName || `Location near ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       
     } catch (err) {
-      // Still check boundary even if geocoding fails
-      const withinPanglao = checkPanglaoBoundary(lat, lng);
-      setIsWithinPanglao(withinPanglao);
+      // Set to false if geocoding fails
+      setIsWithinPanglao(false);
       
       // Set fallback fullAddress on error
       setOriginDetails({
