@@ -8,6 +8,7 @@ import {
   checkPanglaoBoundary,
   checkTagbilaranBoundary 
 } from "../utils/fareCalculator";
+import mapService from "../utils/mapsAPI";
 
 const RouteFinder = () => {
   // Map and route state
@@ -139,16 +140,12 @@ const RouteFinder = () => {
   const fetchEnhancedLocationName = async (lat, lng) => {
     try {
       setOriginAddressLoading(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
-      );
-      const data = await response.json();
+      const data = await mapService.reverseGeocode(lat, lng);
       
-      console.log('Full geocoding response:', data); // Debugging
+      console.log('Full geocoding response:', data);
       
       const address = data.address || {};
-      // Add the display name to the address object for checking
-      address._displayName = data.display_name;
+      address._displayName = data.displayName;
       
       let placeName = getDetailedAddress(data);
       
@@ -163,7 +160,7 @@ const RouteFinder = () => {
         city: address.city,
         province: address.state,
         region: address.region,
-        fullAddress: data.display_name
+        fullAddress: data.displayName
       };
 
       setOriginDetails(newOriginDetails);
@@ -185,15 +182,12 @@ const RouteFinder = () => {
 
       // If no specific place found, try with lower zoom level for broader area
       if (!placeName) {
-        const broaderResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=14`
-        );
-        const broaderData = await broaderResponse.json();
+        const broaderData = await mapService.reverseGeocode(lat, lng, 14);
         placeName = getDetailedAddress(broaderData);
         setOriginDetails(prev => ({
           ...prev,
           ...broaderData.address,
-          fullAddress: broaderData.display_name
+          fullAddress: broaderData.displayName
         }));
         
         // Re-check boundary with broader data
@@ -230,10 +224,7 @@ const RouteFinder = () => {
   const getDetailedAddressForCoordinates = async (lat, lng) => {
     try {
       setClickedAddressLoading(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
-      );
-      const data = await response.json();
+      const data = await mapService.reverseGeocode(lat, lng);
       
       const address = data.address || {};
       let placeName = getDetailedAddress(data);
@@ -248,22 +239,19 @@ const RouteFinder = () => {
         municipality: address.municipality,
         city: address.city,
         province: address.state,
-        fullAddress: data.display_name
+        fullAddress: data.displayName
       };
 
       setClickedDetails(newClickedDetails);
 
       // If no specific place found, try with lower zoom level for broader area
       if (!placeName) {
-        const broaderResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=14`
-        );
-        const broaderData = await broaderResponse.json();
+        const broaderData = await mapService.reverseGeocode(lat, lng, 14);
         placeName = getDetailedAddress(broaderData);
         setClickedDetails(prev => ({
           ...prev,
           ...broaderData.address,
-          fullAddress: broaderData.display_name
+          fullAddress: broaderData.displayName
         }));
       }
       
@@ -281,10 +269,7 @@ const RouteFinder = () => {
   const fetchDestinationDetails = async (lat, lng) => {
     try {
       setDestinationAddressLoading(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`
-      );
-      const data = await response.json();
+      const data = await mapService.reverseGeocode(lat, lng);
       
       const address = data.address || {};
       
@@ -298,11 +283,11 @@ const RouteFinder = () => {
         municipality: address.municipality,
         city: address.city,
         province: address.state,
-        fullAddress: data.display_name
+        fullAddress: data.displayName
       };
 
       setDestinationDetails(newDestinationDetails);
-      return data.display_name;
+      return data.displayName;
     } catch (err) {
       const fallbackAddress = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       setDestinationDetails({ fullAddress: fallbackAddress });
@@ -314,48 +299,25 @@ const RouteFinder = () => {
 
   // NEW: Function to fetch search suggestions
   const fetchSearchSuggestions = async (query) => {
-  if (!query.trim() || query.length < 2) {
-    setSearchSuggestions([]);
-    setShowSuggestions(false);
-    return;
-  }
+    if (!query.trim() || query.length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
-  setSuggestionsLoading(true);
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`
-    );
-    const results = await response.json();
-
-    const suggestions = results.map((result, index) => {
-      const address = result.address || {};
-      
-      // Use the display name but extract a cleaner name for the input
-      const displayName = result.display_name;
-      const primaryName = displayName.split(',')[0].trim();
-
-      return {
-        id: index,
-        name: primaryName, // Clean primary name for input field
-        fullAddress: displayName, // Full address for display
-        lat: parseFloat(result.lat),
-        lon: parseFloat(result.lon),
-        type: result.type,
-        class: result.class,
-        address: address
-      };
-    });
-
-    setSearchSuggestions(suggestions);
-    setShowSuggestions(suggestions.length > 0);
-  } catch (error) {
-    console.error('Error fetching search suggestions:', error);
-    setSearchSuggestions([]);
-    setShowSuggestions(false);
-  } finally {
-    setSuggestionsLoading(false);
-  }
-};
+    setSuggestionsLoading(true);
+    try {
+      const results = await mapService.searchLocation(query);
+      setSearchSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    } catch (error) {
+      console.error('Error fetching search suggestions:', error);
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
 
   // NEW: Handle destination input change with debouncing
   useEffect(() => {
@@ -376,7 +338,7 @@ const RouteFinder = () => {
     console.log('Selected suggestion:', suggestion); // Debug log
     // Use the primary name for the input field
     setDestination(suggestion.name);
-    setDestinationCoords([suggestion.lat, suggestion.lon]);
+    setDestinationCoords([suggestion.lat, suggestion.lng]);
     setShowSuggestions(false);
     
     // Set destination details with full address for display
@@ -387,7 +349,7 @@ const RouteFinder = () => {
 
     // Automatically calculate route if location is available
     if (location) {
-      calculateRoute(suggestion.lat, suggestion.lon);
+      calculateRoute(suggestion.lat, suggestion.lng);
     }
   };
 
@@ -397,21 +359,14 @@ const RouteFinder = () => {
     setSearchError(null);
 
     try {
-      const routeResponse = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destLon},${destLat}?overview=full&geometries=geojson`
+      const routeInfo = await mapService.calculateRoute(
+        location.latitude, 
+        location.longitude, 
+        destLat, 
+        destLon
       );
-      const routeData = await routeResponse.json();
-
-      if (routeData.routes && routeData.routes.length > 0) {
-        const routeInfo = routeData.routes[0];
-        setRoute({
-          distance: routeInfo.distance / 1000,
-          duration: routeInfo.duration / 60,
-          coordinates: routeInfo.geometry.coordinates,
-        });
-      } else {
-        setSearchError("Could not find a route to this destination.");
-      }
+      
+      setRoute(routeInfo);
     } catch (err) {
       setSearchError("Error calculating route. Please try again.");
     } finally {
@@ -439,9 +394,10 @@ const RouteFinder = () => {
         // Store map instance in ref
         mapRef.current.leafletMap = map;
 
-        // Add tile layer
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        // Add tile layer using the service config
+        const tileConfig = mapService.getTileConfig();
+        L.tileLayer(tileConfig.url, {
+          attribution: tileConfig.attribution,
           maxZoom: 19,
         }).addTo(map);
 
@@ -706,18 +662,15 @@ const RouteFinder = () => {
     setSearchError(null);
 
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destination)}&format=json&limit=1`
-      );
-      const results = await response.json();
+      const results = await mapService.searchLocation(destination);
 
       if (!results || results.length === 0) {
         setSearchError("Destination not found. Please try a different search.");
         return;
       }
 
-      const destLat = parseFloat(results[0].lat);
-      const destLon = parseFloat(results[0].lon);
+      const destLat = results[0].lat;
+      const destLon = results[0].lng;
       setDestinationCoords([destLat, destLon]);
 
       await calculateRoute(destLat, destLon);
@@ -763,7 +716,7 @@ const RouteFinder = () => {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-gray-500">
-                      {suggestion.lat.toFixed(4)}, {suggestion.lon.toFixed(4)}
+                      {suggestion.lat.toFixed(4)}, {suggestion.lng.toFixed(4)}
                     </span>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                       {suggestion.type}
